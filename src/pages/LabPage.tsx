@@ -12,20 +12,25 @@ import {
   Copy,
   CheckCheck,
   Zap,
+  MessageSquare,
+  Info,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { mbtiProfiles } from '../data/mbtiProfiles';
 import { skills, skillsById } from '../data/skills';
 import { exampleProblems } from '../data/exampleProblems';
 import { useAppStore } from '../store/useAppStore';
-import { simulateResponse, buildApproachSteps } from '../engine/responseSimulator';
-import { generateSystemPrompt } from '../engine/promptGenerator';
+import { simulateResponse } from '../engine/responseSimulator';
+import {
+  generateSystemPrompt,
+  deriveProblemSolvingWorkflow,
+} from '../engine/promptGenerator';
 import { availableProviders } from '../engine/aiProvider';
 import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
 import { Badge } from '../components/shared/Badge';
 import { IntensitySlider } from '../components/shared/IntensitySlider';
-import type { AIProviderType } from '../types';
+import type { AIProviderType, CommunicationStyle } from '../types';
 
 type LucideIconName = keyof typeof LucideIcons;
 
@@ -34,17 +39,30 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
   return Icon ? <Icon className={className} /> : <Zap className={className} />;
 }
 
+const commOptions: CommunicationStyle[] = [
+  'Balanced',
+  'Concise',
+  'Detailed',
+  'Technical',
+  'Simple',
+  'Socratic',
+  'Direct',
+  'Exploratory',
+];
+
 export function LabPage() {
   const {
     labQuestion,
     labBaseType,
     labSkills,
+    labCommunicationStyle,
     builderProfile,
     setLabQuestion,
     setLabBaseType,
     addLabSkill,
     removeLabSkill,
     setLabSkillIntensity,
+    setLabCommunicationStyle,
     resetLab,
   } = useAppStore();
 
@@ -59,16 +77,18 @@ export function LabPage() {
   const [copied, setCopied] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
 
-  // Load from Builder configuration if available and lab is empty
+  // Load from Builder configuration
   const handleLoadFromBuilder = () => {
     if (builderProfile.baseType) {
-      setLabBaseType(builderProfile.baseType);
       resetLab();
       setLabBaseType(builderProfile.baseType);
       (builderProfile.skills || []).forEach((s) => {
         addLabSkill(s.skillId);
         setLabSkillIntensity(s.skillId, s.intensity);
       });
+      if (builderProfile.communicationStyle) {
+        setLabCommunicationStyle(builderProfile.communicationStyle);
+      }
     }
   };
 
@@ -78,18 +98,23 @@ export function LabPage() {
     setIsRunning(true);
     setResult(null);
 
-    // Simulate thinking delay
     setTimeout(() => {
       const resp = simulateResponse({
         baseType: labBaseType,
         skills: labSkills,
+        communicationStyle: labCommunicationStyle || 'Balanced',
         question: labQuestion,
       });
 
-      const approach = buildApproachSteps(labBaseType);
+      const approach = deriveProblemSolvingWorkflow({
+        baseType: labBaseType,
+        skills: labSkills,
+      });
+
       const prompt = generateSystemPrompt({
         baseType: labBaseType,
         skills: labSkills,
+        communicationStyle: labCommunicationStyle || 'Balanced',
       });
 
       setResult({
@@ -99,7 +124,7 @@ export function LabPage() {
         timestamp: new Date().toLocaleTimeString(),
       });
       setIsRunning(false);
-    }, 600);
+    }, 450);
   };
 
   const handleCopyResponse = async () => {
@@ -114,6 +139,16 @@ export function LabPage() {
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
+        {/* Transparent Labeling Notice */}
+        <div className="mb-6 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 flex-shrink-0 text-cyan-400" />
+            <span>
+              <strong>Rule-based AI behavior simulation</strong> — Demonstrates how distinct cognitive heuristics and skill weights shape reasoning trajectories. (Illustrative simulation, not live LLM reasoning).
+            </span>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -126,7 +161,7 @@ export function LabPage() {
             </h1>
             <p className="text-slate-500 max-w-2xl text-sm sm:text-base">
               Test how any base profile and custom skill setup processes problems in real-time.
-              Runs purely client-side with future modular provider connectivity.
+              Runs purely client-side with zero external API keys required.
             </p>
           </div>
 
@@ -174,7 +209,6 @@ export function LabPage() {
                           : 'bg-white/4 text-slate-400 border border-white/6 hover:bg-white/8 hover:text-slate-200'
                       }`}
                       aria-pressed={isSelected}
-                      aria-label={`Select profile ${p.type}`}
                     >
                       {p.type}
                     </button>
@@ -243,15 +277,44 @@ export function LabPage() {
               )}
             </GlowCard>
 
+            {/* Step 3: Communication Style */}
+            <GlowCard className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-green-400" />
+                  3. Communication Posture
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {commOptions.map((opt) => {
+                  const isSelected = (labCommunicationStyle || 'Balanced') === opt;
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => setLabCommunicationStyle(opt)}
+                      className={`p-2 rounded-lg text-left text-xs transition-all border ${
+                        isSelected
+                          ? 'bg-green-500/20 border-green-500/40 text-green-300 font-medium'
+                          : 'bg-white/3 border-white/5 text-slate-400 hover:bg-white/6'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </GlowCard>
+
             {/* Provider Switcher */}
             <GlowCard className="p-5">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-green-400" />
-                  3. Execution Engine
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  4. Execution Engine
                 </label>
-                <Badge color="green" size="sm">
-                  Client-Side
+                <Badge color="cyan" size="sm">
+                  Client-Side Simulation
                 </Badge>
               </div>
 
@@ -274,9 +337,9 @@ export function LabPage() {
                     >
                       <span>{prov.name}</span>
                       {isMock ? (
-                        <span className="text-[10px] text-cyan-400 font-mono">Ready</span>
+                        <span className="text-[10px] text-cyan-400 font-mono">Active (No Key Needed)</span>
                       ) : (
-                        <span className="text-[10px] text-slate-600 uppercase font-mono">Upcoming</span>
+                        <span className="text-[10px] text-slate-600 uppercase font-mono">Backend Edge API</span>
                       )}
                     </button>
                   );
@@ -296,10 +359,10 @@ export function LabPage() {
                 </label>
                 <button
                   onClick={() => setShowExamples(!showExamples)}
-                  className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                  className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  {showExamples ? 'Hide Samples' : 'Browse Samples'}
+                  {showExamples ? 'Hide Samples' : 'Browse Sample Problems'}
                 </button>
               </div>
 
@@ -319,7 +382,7 @@ export function LabPage() {
                             setLabQuestion(p.description);
                             setShowExamples(false);
                           }}
-                          className="text-xs px-2.5 py-1 rounded bg-white/5 text-slate-300 hover:bg-cyan-500/15 hover:text-cyan-200 border border-white/5 transition-all text-left"
+                          className="text-xs px-2.5 py-1 rounded bg-white/5 text-slate-300 hover:bg-cyan-500/15 hover:text-cyan-200 border border-white/5 text-left"
                         >
                           {p.title}
                         </button>
@@ -369,7 +432,7 @@ export function LabPage() {
                 >
                   <div className="inline-block w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   <p className="text-sm text-cyan-300 font-mono">
-                    Applying {labBaseType} cognitive patterns and {labSkills.length} active skills...
+                    Applying {labBaseType} cognitive trajectory with {labSkills.length} active skills...
                   </p>
                 </motion.div>
               )}
@@ -387,7 +450,7 @@ export function LabPage() {
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                         <span className="text-xs font-mono text-cyan-400 uppercase tracking-wider">
-                          Cognitive Trajectory ({labBaseType})
+                          Cognitive Trajectory ({labBaseType} + {labSkills.length} Skills)
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono">{result.timestamp}</span>
@@ -445,7 +508,7 @@ export function LabPage() {
                     Laboratory Idle
                   </p>
                   <p className="text-xs text-slate-600 max-w-sm mx-auto">
-                    Select a base profile, pick desired skills, write or pick a problem, and hit "Run Simulation".
+                    Select a base profile, configure skills and communication style, then run the simulation.
                   </p>
                 </div>
               )}

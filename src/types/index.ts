@@ -61,31 +61,63 @@ export interface Skill {
   color: string;
 }
 
-// ─── User / Builder ───────────────────────────────────────────────────────────
-export interface SkillIntensity {
+// ─── Communication Styles ─────────────────────────────────────────────────────
+export type CommunicationStyle =
+  | 'Concise'
+  | 'Balanced'
+  | 'Detailed'
+  | 'Technical'
+  | 'Simple'
+  | 'Socratic'
+  | 'Direct'
+  | 'Exploratory';
+
+// ─── Cognitive Profile (First-Class Concept) ──────────────────────────────────
+export interface SkillConfiguration {
   skillId: SkillId;
-  intensity: number;      // 0–100
+  intensity: number;      // Validated 0–100
 }
 
-export interface UserProfile {
+// Alias for backward compatibility
+export type SkillIntensity = SkillConfiguration;
+
+export interface CognitiveProfile {
   id: string;
+  version?: number;
   name: string;
   baseType: MBTITypeCode;
-  skills: SkillIntensity[];
-  communicationPreference?: string;
+  skills: SkillConfiguration[];
+  communicationStyle?: CommunicationStyle | string;
+  communicationPreference?: string; // backward compat
   customInstructions?: string;
   createdAt: string;
 }
 
-// ─── Comparison ───────────────────────────────────────────────────────────────
+// Alias for backward compatibility
+export type UserProfile = CognitiveProfile;
+
+// ─── Comparison Item (MBTI type OR Custom Cognitive Profile) ──────────────────
+export interface ComparisonTarget {
+  id: string;
+  label: string;
+  isCustom: boolean;
+  baseType: MBTITypeCode;
+  skills: SkillConfiguration[];
+  communicationStyle?: string;
+  customInstructions?: string;
+}
+
 export interface ComparisonPanel {
+  targetId: string;
   profileType: MBTITypeCode;
+  label: string;
   problem: string;
   approach: string[];
   simulatedResponse: string;
+  dominantSkills: string[];
 }
 
-// ─── AI Provider (future) ────────────────────────────────────────────────────
+// ─── AI Provider ─────────────────────────────────────────────────────────────
 export type AIProviderType = 'mock' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'local';
 
 export interface AIProvider {
@@ -104,11 +136,13 @@ export interface ExampleProblem {
 
 // ─── Store State ──────────────────────────────────────────────────────────────
 export interface AppState {
-  savedProfiles: UserProfile[];
-  builderProfile: Partial<UserProfile>;
-  selectedComparisons: MBTITypeCode[];
+  version: number;
+  savedProfiles: CognitiveProfile[];
+  builderProfile: Partial<CognitiveProfile>;
+  selectedComparisons: string[]; // IDs: can be MBTITypeCode or custom profile ID
   compareQuestion: string;
   labQuestion: string;
   labBaseType: MBTITypeCode | null;
-  labSkills: SkillIntensity[];
+  labSkills: SkillConfiguration[];
+  labCommunicationStyle?: CommunicationStyle | string;
 }

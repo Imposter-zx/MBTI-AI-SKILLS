@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   Plus,
@@ -11,12 +11,30 @@ import {
   Shuffle,
   CheckCheck,
   Trash2,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  Sparkles,
+  ArrowRight,
+  Brain,
+  MessageSquare,
+  Sliders,
+  Layers,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { mbtiProfiles } from '../data/mbtiProfiles';
 import { skills, skillsById } from '../data/skills';
 import { useAppStore } from '../store/useAppStore';
-import { generateSystemPrompt } from '../engine/promptGenerator';
+import {
+  generateSystemPrompt,
+  generateCognitiveProfileName,
+  describeCognitiveBehavior,
+  deriveProblemSolvingWorkflow,
+  communicationStyleDescriptions,
+  clampIntensity,
+} from '../engine/promptGenerator';
 import {
   buildShareUrl,
   readProfileFromUrl,
@@ -25,19 +43,36 @@ import {
 } from '../engine/profileSerializer';
 import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
-import { Badge } from '../components/shared/Badge';
 import { IntensitySlider } from '../components/shared/IntensitySlider';
 import { PromptPreview } from '../components/shared/PromptPreview';
-import type { MBTITypeCode } from '../types';
+import type { MBTITypeCode, CommunicationStyle } from '../types';
 
 type LucideIconName = keyof typeof LucideIcons;
 
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
   const Icon = LucideIcons[name as LucideIconName] as React.ComponentType<{ className?: string }>;
-  return Icon ? <Icon className={className} /> : null;
+  return Icon ? <Icon className={className} /> : <Sparkles className={className} />;
 }
 
-const steps = ['Base Profile', 'Add Skills', 'Adjust Intensity', 'Generate'];
+const availableCommunicationStyles: CommunicationStyle[] = [
+  'Balanced',
+  'Concise',
+  'Detailed',
+  'Technical',
+  'Simple',
+  'Socratic',
+  'Direct',
+  'Exploratory',
+];
+
+const steps = [
+  { id: 0, label: 'Base Profile', icon: Brain },
+  { id: 1, label: 'Skills & Order', icon: Layers },
+  { id: 2, label: 'Intensity', icon: Sliders },
+  { id: 3, label: 'Communication', icon: MessageSquare },
+  { id: 4, label: 'Instructions', icon: FileText },
+  { id: 5, label: 'Cognitive Profile', icon: Sparkles },
+];
 
 export function BuilderPage() {
   const {
@@ -48,13 +83,15 @@ export function BuilderPage() {
     addBuilderSkill,
     removeBuilderSkill,
     setSkillIntensity,
-    setBuilderCommunication,
+    reorderSkills,
+    setBuilderCommunicationStyle,
     setBuilderCustomInstructions,
     resetBuilder,
     saveCurrentProfile,
     deleteSavedProfile,
     loadSavedProfile,
     loadBuilderProfile,
+    generateRandomProfile,
   } = useAppStore();
 
   const [step, setStep] = useState(0);
@@ -63,13 +100,18 @@ export function BuilderPage() {
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState('');
+  const [skillSearch, setSkillSearch] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string>('all');
+  const [urlNotice, setUrlNotice] = useState<string | null>(null);
 
   // Load profile from URL on mount
   useEffect(() => {
-    const fromUrl = readProfileFromUrl();
-    if (fromUrl) {
+    const { profile: fromUrl, error } = readProfileFromUrl();
+    if (error) {
+      setUrlNotice(error);
+    } else if (fromUrl) {
       loadBuilderProfile(fromUrl);
-      setStep(3);
+      setStep(5);
     }
   }, []);
 
@@ -92,58 +134,113 @@ export function BuilderPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mbti-ai-profile.json';
+    a.download = `${builderProfile.baseType || 'cognitive'}-profile.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleImportJson = () => {
     setImportError('');
-    const imported = importProfileJson(importText);
-    if (!imported) {
-      setImportError('Invalid JSON. Make sure it follows the MBTI AI Skills format.');
+    const result = importProfileJson(importText);
+    if (!result.success || !result.profile) {
+      setImportError(result.error || 'Failed to import JSON.');
       return;
     }
-    loadBuilderProfile(imported);
+    loadBuilderProfile(result.profile);
     setImportText('');
-    setStep(3);
-  };
-
-  const handleRandomProfile = () => {
-    const randomProfile = mbtiProfiles[Math.floor(Math.random() * mbtiProfiles.length)];
-    resetBuilder();
-    setBuilderBaseType(randomProfile.type);
-    const randomSkills = [...skills].sort(() => Math.random() - 0.5).slice(0, 3);
-    randomSkills.forEach((s) => addBuilderSkill(s.id));
-    setStep(3);
+    setStep(5);
   };
 
   const activeProfile = mbtiProfiles.find((p) => p.type === builderProfile.baseType);
   const activeSkills = builderProfile.skills || [];
 
-  const generatedName = useMemo(() => {
-    if (builderProfile.name) return builderProfile.name;
-    if (!builderProfile.baseType) return 'My AI Profile';
-    const skillNames = activeSkills.slice(0, 3).map((s) => skillsById[s.skillId]?.name ?? '').filter(Boolean);
-    if (skillNames.length === 0) return `${builderProfile.baseType} Configuration`;
-    return skillNames.join(' + ') + ' AI';
+  const autoGeneratedName = useMemo(() => {
+    return generateCognitiveProfileName(builderProfile.baseType, activeSkills);
+  }, [builderProfile.baseType, activeSkills]);
+
+  const currentDisplayName = builderProfile.name || autoGeneratedName;
+
+  // Reorder skills handlers
+  const moveSkill = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= activeSkills.length) return;
+
+    const updated = [...activeSkills];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    reorderSkills(updated);
+  };
+
+  // Skill filter tags
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    skills.forEach((s) => s.tags.forEach((t) => set.add(t)));
+    return ['all', ...Array.from(set).slice(0, 6)];
+  }, []);
+
+  const filteredSkills = useMemo(() => {
+    return skills.filter((s) => {
+      const matchesSearch =
+        s.name.toLowerCase().includes(skillSearch.toLowerCase()) ||
+        s.description.toLowerCase().includes(skillSearch.toLowerCase()) ||
+        s.tags.some((t) => t.toLowerCase().includes(skillSearch.toLowerCase()));
+
+      const matchesTag = selectedTag === 'all' || s.tags.includes(selectedTag);
+      return matchesSearch && matchesTag;
+    });
+  }, [skillSearch, selectedTag]);
+
+  const cognitiveBehaviorSummary = useMemo(() => {
+    return describeCognitiveBehavior(builderProfile);
+  }, [builderProfile]);
+
+  const problemSolvingWorkflow = useMemo(() => {
+    return deriveProblemSolvingWorkflow(builderProfile);
   }, [builderProfile]);
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
+        {/* URL Notice Banner */}
+        <AnimatePresence>
+          {urlNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-center justify-between text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                <span>{urlNotice}</span>
+              </div>
+              <button
+                onClick={() => setUrlNotice(null)}
+                className="text-amber-400 hover:text-amber-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/5 text-cyan-400 text-xs font-medium mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              Cognitive Profile Architecture
+            </div>
             <h1 className="text-4xl font-bold text-slate-100 mb-2">
-              Build Your <span className="gradient-text">AI Mind</span>
+              Build Your <span className="gradient-text">Cognitive Profile</span>
             </h1>
-            <p className="text-slate-500">
-              Combine a base MBTI profile with modular cognitive Skills to generate a custom AI system prompt.
+            <p className="text-slate-500 text-sm sm:text-base">
+              MBTI is only your starting style. Select modular Skills, adjust continuous intensities, calibrate communication, and construct your AI mind.
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="ghost" size="sm" onClick={handleRandomProfile}>
+
+          <div className="flex gap-2 flex-wrap items-center">
+            <Button variant="ghost" size="sm" onClick={() => generateRandomProfile(true)}>
               <Shuffle className="w-4 h-4" />
               Surprise Me
             </Button>
@@ -155,38 +252,43 @@ export function BuilderPage() {
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
-          {steps.map((label, i) => (
-            <div key={i} className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setStep(i)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  step === i
-                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                    : i < step
-                    ? 'text-slate-400 hover:text-slate-200'
-                    : 'text-slate-600 cursor-default'
-                }`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  i < step ? 'bg-cyan-500 text-white' : step === i ? 'bg-cyan-500/30 text-cyan-300' : 'bg-white/5 text-slate-600'
-                }`}>
-                  {i < step ? '✓' : i + 1}
-                </span>
-                {label}
-              </button>
-              {i < steps.length - 1 && <div className="w-6 h-px bg-white/10 flex-shrink-0" />}
-            </div>
-          ))}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-thin">
+          {steps.map((s) => {
+            const Icon = s.icon;
+            const isActive = step === s.id;
+            const isCompleted = s.id < step;
+            return (
+              <div key={s.id} className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setStep(s.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                      : isCompleted
+                      ? 'text-slate-300 hover:text-white bg-white/5 border border-white/5'
+                      : 'text-slate-600 hover:text-slate-400 border border-transparent'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{s.label}</span>
+                  {isCompleted && <span className="text-cyan-400 font-bold">✓</span>}
+                </button>
+                {s.id < steps.length - 1 && <div className="w-4 h-px bg-white/10 flex-shrink-0" />}
+              </div>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main config panel */}
+          {/* Main config panel (Left 2 cols) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Step 0: Base Profile */}
             <GlowCard className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-slate-200">Step 1 — Base Profile</h2>
+                <div className="flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-cyan-400" />
+                  <h2 className="font-semibold text-slate-200">Step 1 — Choose Starting Base</h2>
+                </div>
                 {activeProfile && (
                   <span
                     className="text-sm font-bold bg-clip-text text-transparent"
@@ -197,103 +299,187 @@ export function BuilderPage() {
                 )}
               </div>
 
+              <p className="text-xs text-slate-400 mb-3">
+                Select an MBTI-inspired cognitive starting point. This provides baseline problem-framing heuristics.
+              </p>
+
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                {mbtiProfiles.map((profile) => {
-                  const selected = builderProfile.baseType === profile.type;
+                {mbtiProfiles.map((p) => {
+                  const selected = builderProfile.baseType === p.type;
                   return (
                     <button
-                      key={profile.type}
-                      onClick={() => setBuilderBaseType(profile.type as MBTITypeCode)}
+                      key={p.type}
+                      onClick={() => setBuilderBaseType(p.type as MBTITypeCode)}
                       className={`px-2 py-2 rounded-lg text-xs font-bold transition-all text-center ${
                         selected
-                          ? 'border text-white'
-                          : 'bg-white/4 text-slate-500 border border-white/6 hover:bg-white/8 hover:text-slate-300'
+                          ? 'border text-white shadow-md shadow-cyan-500/10'
+                          : 'bg-white/4 text-slate-400 border border-white/6 hover:bg-white/8 hover:text-slate-200'
                       }`}
                       style={selected ? { background: activeProfile?.gradient, borderColor: 'transparent' } : {}}
                       aria-pressed={selected}
                     >
-                      {profile.type}
+                      {p.type}
                     </button>
                   );
                 })}
               </div>
 
               {activeProfile && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mt-4 p-3 rounded-lg bg-white/3 border border-white/6"
-                >
-                  <p className="text-xs text-slate-500 leading-relaxed">{activeProfile.description}</p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {activeProfile.tags.slice(0, 5).map((t) => (
-                      <Badge key={t} color="slate" size="sm">{t}</Badge>
-                    ))}
+                <div className="mt-4 p-3.5 rounded-lg bg-white/3 border border-white/6 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-cyan-400 font-semibold">{activeProfile.category}</span>
+                    <span className="text-slate-500">{activeProfile.tagline}</span>
                   </div>
-                </motion.div>
+                  <p className="text-xs text-slate-400 leading-relaxed">{activeProfile.description}</p>
+                  <div className="pt-2 border-t border-white/5">
+                    <span className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+                      Recommended Initial Skills:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeProfile.recommendedSkills.map((sid) => {
+                        const sk = skillsById[sid];
+                        const alreadyActive = activeSkills.some((s) => s.skillId === sid);
+                        return sk ? (
+                          <button
+                            key={sid}
+                            onClick={() => !alreadyActive && addBuilderSkill(sid)}
+                            disabled={alreadyActive}
+                            className={`text-[10px] px-2 py-0.5 rounded border transition-all ${
+                              alreadyActive
+                                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 cursor-default'
+                                : 'bg-white/5 text-slate-400 border-white/10 hover:border-cyan-500/40 hover:text-cyan-300'
+                            }`}
+                          >
+                            + {sk.name} {alreadyActive && '(added)'}
+                          </button>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                </div>
               )}
             </GlowCard>
 
-            {/* Step 2: Skills */}
+            {/* Step 1: Modular Skills & Reordering */}
             <GlowCard className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-slate-200">Step 2 — Add Skills</h2>
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-purple-400" />
+                  <h2 className="font-semibold text-slate-200">Step 2 — Modular Cognitive Skills</h2>
+                </div>
                 <span className="text-xs text-slate-500">{activeSkills.length} active</span>
               </div>
 
-              {/* Active skills */}
+              {/* Active Skills List with Reordering */}
               {activeSkills.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {activeSkills.map((si) => {
-                    const skill = skillsById[si.skillId];
-                    return skill ? (
-                      <div
-                        key={si.skillId}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs"
-                      >
-                        <DynamicIcon name={skill.icon} className="w-3 h-3" />
-                        {skill.name}
-                        <button
-                          onClick={() => removeBuilderSkill(si.skillId)}
-                          className="text-cyan-500 hover:text-cyan-200 transition-colors"
-                          aria-label={`Remove ${skill.name}`}
+                <div className="mb-5 p-3 rounded-lg bg-[#0d1421] border border-white/6 space-y-2">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                    Active Skills & Priority Order (Top to Bottom)
+                  </div>
+                  <div className="space-y-1.5">
+                    {activeSkills.map((si, idx) => {
+                      const skill = skillsById[si.skillId];
+                      if (!skill) return null;
+                      return (
+                        <div
+                          key={si.skillId}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/3 border border-white/5 text-xs text-slate-200"
                         >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : null;
-                  })}
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 text-slate-500 font-mono text-[10px]">{idx + 1}.</span>
+                            <DynamicIcon name={skill.icon} className="w-3.5 h-3.5 text-cyan-400" />
+                            <span className="font-medium text-slate-200">{skill.name}</span>
+                            <span className="text-slate-500 font-mono text-[10px]">({si.intensity}%)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => moveSkill(idx, 'up')}
+                              disabled={idx === 0}
+                              className="p-1 text-slate-500 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label="Move skill up"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveSkill(idx, 'down')}
+                              disabled={idx === activeSkills.length - 1}
+                              className="p-1 text-slate-500 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label="Move skill down"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => removeBuilderSkill(si.skillId)}
+                              className="p-1 text-slate-500 hover:text-rose-400"
+                              aria-label={`Remove ${skill.name}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
+              {/* Search & Tag filter */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Search cognitive skills..."
+                    value={skillSearch}
+                    onChange={(e) => setSkillSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(tag)}
+                      className={`text-[10px] px-2 py-1 rounded capitalize transition-all ${
+                        selectedTag === tag
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          : 'bg-white/3 text-slate-400 border border-white/5 hover:bg-white/6'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Available skills grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {skills.map((skill) => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+                {filteredSkills.map((skill) => {
                   const active = activeSkills.some((s) => s.skillId === skill.id);
                   return (
                     <button
                       key={skill.id}
-                      onClick={() => active ? removeBuilderSkill(skill.id) : addBuilderSkill(skill.id)}
-                      className={`flex items-start gap-3 p-3 rounded-lg text-left transition-all ${
+                      onClick={() => (active ? removeBuilderSkill(skill.id) : addBuilderSkill(skill.id))}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg text-left transition-all border ${
                         active
-                          ? 'bg-cyan-500/10 border border-cyan-500/20'
-                          : 'bg-white/3 border border-white/6 hover:bg-white/6 hover:border-white/12'
+                          ? 'bg-cyan-500/10 border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+                          : 'bg-white/3 border-white/5 hover:bg-white/6 hover:border-white/10'
                       }`}
                       aria-pressed={active}
                     >
-                      <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${active ? 'bg-cyan-500/20' : 'bg-white/5'}`}>
-                        <DynamicIcon name={skill.icon} className={`w-4 h-4 ${active ? 'text-cyan-400' : 'text-slate-500'}`} />
+                      <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${active ? 'bg-cyan-500/20' : 'bg-white/5'}`}>
+                        <DynamicIcon name={skill.icon} className={`w-3.5 h-3.5 ${active ? 'text-cyan-400' : 'text-slate-500'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className={`text-xs font-semibold mb-0.5 ${active ? 'text-cyan-300' : 'text-slate-400'}`}>
+                        <div className={`text-xs font-semibold ${active ? 'text-cyan-300' : 'text-slate-300'}`}>
                           {skill.name}
                         </div>
-                        <div className="text-[10px] text-slate-600 leading-relaxed">
+                        <div className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed">
                           {skill.shortDescription}
                         </div>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 ${active ? 'bg-cyan-500 border-cyan-400' : 'border-white/15'}`}>
-                        {active ? <X className="w-3 h-3 text-white" /> : <Plus className="w-3 h-3 text-slate-600" />}
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 ${active ? 'bg-cyan-500 border-cyan-400' : 'border-white/20'}`}>
+                        {active ? <X className="w-2.5 h-2.5 text-white" /> : <Plus className="w-2.5 h-2.5 text-slate-400" />}
                       </div>
                     </button>
                   );
@@ -301,159 +487,211 @@ export function BuilderPage() {
               </div>
             </GlowCard>
 
-            {/* Step 3: Intensities */}
+            {/* Step 2: Continuous Intensity Sliders */}
             {activeSkills.length > 0 && (
               <GlowCard className="p-6">
-                <h2 className="font-semibold text-slate-200 mb-4">Step 3 — Adjust Intensity</h2>
-                <div className="space-y-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <h2 className="font-semibold text-slate-200">Step 3 — Skill Intensity Calibration</h2>
+                </div>
+                <p className="text-xs text-slate-400 mb-5">
+                  Continuous weight (0–100%) changes the behavioral directives generated in the system prompt.
+                </p>
+
+                <div className="space-y-4">
                   {activeSkills.map((si) => {
                     const skill = skillsById[si.skillId];
-                    return skill ? (
-                      <div key={si.skillId}>
+                    if (!skill) return null;
+                    return (
+                      <div key={si.skillId} className="p-3 rounded-lg bg-white/2 border border-white/5">
                         <div className="flex items-center gap-2 mb-2">
-                          <DynamicIcon name={skill.icon} className="w-4 h-4 text-slate-500" />
-                          <IntensitySlider
-                            value={si.intensity}
-                            onChange={(v) => setSkillIntensity(si.skillId, v)}
-                            label={skill.name}
-                          />
+                          <DynamicIcon name={skill.icon} className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs font-semibold text-slate-200">{skill.name} Skill</span>
                         </div>
+                        <IntensitySlider
+                          value={si.intensity}
+                          onChange={(v) => setSkillIntensity(si.skillId, clampIntensity(v))}
+                        />
                       </div>
-                    ) : null;
+                    );
                   })}
                 </div>
               </GlowCard>
             )}
 
-            {/* Custom name + instructions */}
+            {/* Step 3: Communication Style */}
             <GlowCard className="p-6">
-              <h2 className="font-semibold text-slate-200 mb-4">Step 4 — Personalize (Optional)</h2>
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="w-4 h-4 text-green-400" />
+                <h2 className="font-semibold text-slate-200">Step 4 — Communication Calibration</h2>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">
+                Select an interaction posture to tailor how the AI structures tone, depth, and presentation.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                {availableCommunicationStyles.map((style) => {
+                  const isSelected = (builderProfile.communicationStyle || 'Balanced') === style;
+                  return (
+                    <button
+                      key={style}
+                      onClick={() => setBuilderCommunicationStyle(style)}
+                      className={`p-2 rounded-lg text-left text-xs transition-all border ${
+                        isSelected
+                          ? 'bg-green-500/15 border-green-500/40 text-green-300 font-semibold'
+                          : 'bg-white/3 border-white/5 text-slate-400 hover:bg-white/6'
+                      }`}
+                    >
+                      <div className="font-medium">{style}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {builderProfile.communicationStyle && (
+                <div className="text-xs text-slate-400 p-2.5 rounded bg-white/3 border border-white/5">
+                  <span className="text-green-400 font-medium">Directive: </span>
+                  {communicationStyleDescriptions[builderProfile.communicationStyle as CommunicationStyle] || 'Custom formatting directive.'}
+                </div>
+              )}
+            </GlowCard>
+
+            {/* Step 4: Custom Instructions */}
+            <GlowCard className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <h2 className="font-semibold text-slate-200">Step 5 — Custom Instructions & Identity</h2>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Profile Name</label>
+                  <label className="text-xs text-slate-400 mb-1 block">Profile Name (Override)</label>
                   <input
                     type="text"
                     value={builderProfile.name || ''}
                     onChange={(e) => setBuilderName(e.target.value)}
-                    placeholder={generatedName}
-                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40 transition-all"
+                    placeholder={autoGeneratedName}
+                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-200 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Communication Preference</label>
-                  <input
-                    type="text"
-                    value={builderProfile.communicationPreference || ''}
-                    onChange={(e) => setBuilderCommunication(e.target.value)}
-                    placeholder="e.g. concise, technical, with examples..."
-                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Custom Instructions</label>
+                  <label className="text-xs text-slate-400 mb-1 block">Custom Behavioral Invariants</label>
                   <textarea
                     value={builderProfile.customInstructions || ''}
                     onChange={(e) => setBuilderCustomInstructions(e.target.value)}
-                    placeholder="Add any additional instructions to append to your system prompt..."
+                    placeholder="e.g. Always explain technical concepts step-by-step; prioritize zero-dependency code..."
                     rows={3}
-                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40 resize-none transition-all"
+                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-200 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40 resize-none"
                   />
                 </div>
               </div>
             </GlowCard>
           </div>
 
-          {/* Right panel */}
-          <div className="space-y-4">
-            {/* Profile summary */}
-            {activeProfile && (
-              <GlowCard className="p-5">
-                <div
-                  className="text-3xl font-black mb-1 bg-clip-text text-transparent"
-                  style={{ backgroundImage: activeProfile.gradient }}
-                >
-                  {activeProfile.type}
-                </div>
-                <div className="text-slate-300 font-semibold mb-0.5">{generatedName}</div>
-                <div className="text-xs text-slate-500 mb-3">{activeProfile.tagline}</div>
+          {/* Right Column: Generated Cognitive Profile & Actions */}
+          <div className="space-y-5">
+            {/* Generated Cognitive Profile Card */}
+            <GlowCard className="p-5 border-cyan-500/20">
+              <div className="text-[10px] text-cyan-400 uppercase tracking-widest font-mono mb-1">
+                YOUR AI COGNITIVE PROFILE
+              </div>
+              <h3 className="text-xl font-bold text-slate-100 mb-1">{currentDisplayName}</h3>
+              <div className="text-xs text-slate-500 mb-4">
+                Base: <span className="text-cyan-300 font-bold">{builderProfile.baseType || 'None'}</span> •{' '}
+                Comm: <span className="text-green-300">{builderProfile.communicationStyle || 'Balanced'}</span>
+              </div>
 
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {activeSkills.map((si) => {
-                    const skill = skillsById[si.skillId];
-                    return skill ? (
-                      <span key={si.skillId} className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500">
-                        {skill.name} {si.intensity}%
-                      </span>
-                    ) : null;
-                  })}
-                </div>
+              {/* Dominant Skills List */}
+              <div className="mb-4 space-y-1">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block">
+                  Dominant Skills
+                </span>
+                {activeSkills.length === 0 ? (
+                  <span className="text-xs text-slate-600 italic">No skills selected (using base defaults)</span>
+                ) : (
+                  <div className="space-y-1">
+                    {activeSkills.map((si) => {
+                      const sk = skillsById[si.skillId];
+                      return sk ? (
+                        <div key={si.skillId} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-300">{sk.name}</span>
+                          <span className="font-mono text-cyan-400 font-semibold">{si.intensity}%</span>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
 
-                {/* Actions */}
-                <div className="space-y-2">
-                  <Button
-                    onClick={saveCurrentProfile}
-                    variant="secondary"
-                    size="sm"
-                    fullWidth
-                    disabled={!builderProfile.baseType}
-                  >
-                    <Save className="w-4 h-4" />
-                    Save Profile
-                  </Button>
-                  <Button
-                    onClick={handleShare}
-                    variant="ghost"
-                    size="sm"
-                    fullWidth
-                    disabled={!builderProfile.baseType}
-                  >
-                    {copied ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
-                    {copied ? 'URL Copied!' : 'Share Profile URL'}
-                  </Button>
-                  <Button
-                    onClick={handleExportJson}
-                    variant="ghost"
-                    size="sm"
-                    fullWidth
-                    disabled={!builderProfile.baseType}
-                  >
-                    <Download className="w-4 h-4" />
-                    Export JSON
-                  </Button>
-                </div>
-              </GlowCard>
-            )}
+              {/* Cognitive Behavior Summary */}
+              <div className="mb-4 pt-3 border-t border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-1">
+                  Cognitive Behavior
+                </span>
+                <p className="text-xs text-slate-400 leading-relaxed">{cognitiveBehaviorSummary}</p>
+              </div>
 
-            {/* Saved profiles */}
+              {/* Problem Solving Sequence */}
+              <div className="mb-5 pt-3 border-t border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-2">
+                  Problem-Solving Process
+                </span>
+                <div className="space-y-1">
+                  {problemSolvingWorkflow.slice(0, 5).map((stepText, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-400">
+                      <span className="text-cyan-400 font-mono text-[10px] mt-0.5">{idx + 1}.</span>
+                      <span className="leading-snug">{stepText}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <Button onClick={saveCurrentProfile} variant="primary" size="sm" fullWidth disabled={!builderProfile.baseType}>
+                  <Save className="w-4 h-4" />
+                  Save Cognitive Profile
+                </Button>
+                <Button onClick={handleShare} variant="secondary" size="sm" fullWidth disabled={!builderProfile.baseType}>
+                  {copied ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+                  {copied ? 'Share Link Copied!' : 'Share Profile URL'}
+                </Button>
+                <Button onClick={handleExportJson} variant="ghost" size="sm" fullWidth disabled={!builderProfile.baseType}>
+                  <Download className="w-4 h-4" />
+                  Export JSON Profile
+                </Button>
+              </div>
+            </GlowCard>
+
+            {/* Saved Profiles Library */}
             {savedProfiles.length > 0 && (
               <GlowCard className="p-5">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3">Saved Profiles</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">
+                  Saved Profiles ({savedProfiles.length})
+                </h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
                   {savedProfiles.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/3 border border-white/6"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-slate-300 truncate">{p.name}</div>
-                        <div className="text-[10px] text-slate-600">{p.baseType}</div>
+                    <div key={p.id} className="p-2.5 rounded-lg bg-white/3 border border-white/6 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-slate-200 truncate">{p.name}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {p.baseType} • {p.skills.length} skills
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => loadSavedProfile(p.id)}
-                          className="text-xs text-cyan-500 hover:text-cyan-300 transition-colors px-2 py-1"
+                          className="px-2 py-1 rounded text-xs text-cyan-400 hover:bg-cyan-500/10 transition-colors"
                         >
                           Load
                         </button>
                         <button
                           onClick={() => deleteSavedProfile(p.id)}
-                          className="text-slate-600 hover:text-rose-400 transition-colors p-1"
-                          aria-label="Delete profile"
+                          className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                          aria-label={`Delete ${p.name}`}
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -464,42 +702,37 @@ export function BuilderPage() {
 
             {/* Import JSON */}
             <GlowCard className="p-5">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">Import JSON</h3>
+              <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Import Profile JSON
+              </h3>
               <textarea
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
-                placeholder={'{\n  "baseType": "INTP",\n  "skills": [...]\n}'}
-                rows={5}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-700 text-xs font-mono focus:outline-none focus:border-cyan-500/40 resize-none transition-all mb-2"
+                placeholder={'{\n  "baseType": "INTP",\n  "skills": [\n    {"skillId": "analytical", "intensity": 95}\n  ]\n}'}
+                rows={4}
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-700 text-xs font-mono focus:outline-none focus:border-cyan-500/40 resize-none mb-2"
               />
-              {importError && (
-                <p className="text-xs text-rose-400 mb-2">{importError}</p>
-              )}
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                onClick={handleImportJson}
-                disabled={!importText.trim()}
-              >
-                <Upload className="w-4 h-4" />
-                Import Profile
+              {importError && <p className="text-xs text-rose-400 mb-2">{importError}</p>}
+              <Button variant="secondary" size="sm" fullWidth onClick={handleImportJson} disabled={!importText.trim()}>
+                <Upload className="w-3.5 h-3.5" />
+                Import Configuration
               </Button>
             </GlowCard>
           </div>
         </div>
 
-        {/* Generated prompt */}
+        {/* Generated System Prompt Section */}
         {builderProfile.baseType && (
-          <div className="mt-8">
+          <div className="mt-10">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-200">Generated System Prompt</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsEditingPrompt(!isEditingPrompt)}
-              >
-                {isEditingPrompt ? 'View Mode' : 'Edit Mode'}
+              <div>
+                <h2 className="text-2xl font-bold text-slate-100">Generated System Prompt</h2>
+                <p className="text-xs text-slate-500">
+                  Ready to copy and paste directly into ChatGPT, Claude, Cursor, or local LLMs.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsEditingPrompt(!isEditingPrompt)}>
+                {isEditingPrompt ? 'View Mode' : 'Edit Prompt'}
               </Button>
             </div>
             <PromptPreview
@@ -511,12 +744,13 @@ export function BuilderPage() {
           </div>
         )}
 
-        {/* Link to test in lab */}
+        {/* Test Lab Link */}
         {builderProfile.baseType && (
-          <div className="mt-4 text-center">
+          <div className="mt-8 text-center">
             <Link to="/lab">
-              <Button variant="secondary">
-                Test This Configuration in the Lab →
+              <Button variant="secondary" size="lg">
+                Test This Cognitive Profile in the Lab
+                <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
           </div>

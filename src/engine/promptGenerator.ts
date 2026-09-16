@@ -1,107 +1,273 @@
-import type { UserProfile, SkillIntensity } from '../types';
+import type { CognitiveProfile, SkillConfiguration, CommunicationStyle } from '../types';
 import { skillsById } from '../data/skills';
 import { profilesByType } from '../data/mbtiProfiles';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Intensity Transformation ────────────────────────────────────────────────
 
-function intensityLabel(intensity: number): string {
-  if (intensity >= 90) return 'extremely';
-  if (intensity >= 75) return 'strongly';
-  if (intensity >= 60) return 'moderately';
-  if (intensity >= 40) return 'somewhat';
-  return 'lightly';
+export interface IntensityTier {
+  label: string;
+  adverb: string;
+  directiveTemplate: (behavior: string) => string;
 }
 
-function skillBehaviors(si: SkillIntensity): string {
-  const skill = skillsById[si.skillId];
-  if (!skill) return '';
-  const count = si.intensity >= 75 ? skill.behaviors.length : Math.ceil(skill.behaviors.length * 0.6);
-  return skill.behaviors.slice(0, count).map((b) => `  - ${b}`).join('\n');
+export function clampIntensity(value: number): number {
+  if (isNaN(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-// ─── Main generator ───────────────────────────────────────────────────────────
+export function getIntensityTier(intensity: number): IntensityTier {
+  const clamped = clampIntensity(intensity);
 
-export function generateSystemPrompt(profile: Partial<UserProfile>): string {
-  const { baseType, skills = [], name, communicationPreference, customInstructions } = profile;
+  if (clamped >= 90) {
+    return {
+      label: 'Core Driver (90–100%)',
+      adverb: 'strongly prioritize',
+      directiveTemplate: (behavior: string) => `Strongly prioritize ${behavior.toLowerCase()}`,
+    };
+  }
+  if (clamped >= 60) {
+    return {
+      label: 'Active Modifier (60–89%)',
+      adverb: 'regularly use',
+      directiveTemplate: (behavior: string) => `Regularly use ${behavior.toLowerCase()}`,
+    };
+  }
+  if (clamped >= 30) {
+    return {
+      label: 'Situational (30–59%)',
+      adverb: 'consider when useful',
+      directiveTemplate: (behavior: string) => `Consider ${behavior.toLowerCase()} when useful`,
+    };
+  }
+  return {
+    label: 'Minimal (0–29%)',
+    adverb: 'use only when appropriate',
+    directiveTemplate: (behavior: string) => `Use ${behavior.toLowerCase()} only when strictly appropriate`,
+  };
+}
+
+// ─── Communication Style Guidance ────────────────────────────────────────────
+
+export const communicationStyleDescriptions: Record<CommunicationStyle, string> = {
+  Concise: 'Deliver terse, high-signal responses. Eliminate superfluous framing, filler, and repetitive summaries.',
+  Balanced: 'Provide thorough explanations balanced with clear, direct takeaways.',
+  Detailed: 'Provide comprehensive, deep-dive explanations covering underlying context, edge cases, and nuances.',
+  Technical: 'Use precise technical terminology, formal architectural descriptions, and structured code/pseudocode.',
+  Simple: 'Explain concepts plainly with accessible analogies, avoiding jargon where everyday language suffices.',
+  Socratic: 'Engage through structured questions that prompt the user to examine premises and derive insights.',
+  Direct: 'Be blunt, actionable, and bottom-line focused. State findings immediately before supporting rationale.',
+  Exploratory: 'Examine multiple angles, embrace creative tangents, and present diverse perspectives before converging.',
+};
+
+// ─── Name & Workflow Derivation ──────────────────────────────────────────────
+
+export function generateCognitiveProfileName(
+  baseType?: string,
+  skills: SkillConfiguration[] = []
+): string {
+  if (!baseType) return 'Custom Cognitive Profile';
+  const profile = profilesByType[baseType];
+
+  const dominant = [...skills]
+    .map((s) => ({ ...s, intensity: clampIntensity(s.intensity) }))
+    .sort((a, b) => b.intensity - a.intensity)
+    .filter((s) => s.intensity >= 40)
+    .slice(0, 3)
+    .map((s) => skillsById[s.skillId]?.name)
+    .filter(Boolean);
+
+  if (dominant.length === 0) {
+    return `${baseType} ${profile?.name ?? 'Mind'} AI`;
+  }
+
+  return `${dominant.join(' ')} AI`;
+}
+
+export function deriveProblemSolvingWorkflow(profile: Partial<CognitiveProfile>): string[] {
+  const { baseType, skills = [] } = profile;
+  const steps: string[] = ['Understand the user objective and constraints'];
+
+  const sortedSkills = [...skills]
+    .map((s) => ({ ...s, intensity: clampIntensity(s.intensity) }))
+    .sort((a, b) => b.intensity - a.intensity)
+    .filter((s) => s.intensity >= 30);
+
+  const activeIds = new Set(sortedSkills.map((s) => s.skillId));
+
+  if (activeIds.has('analytical')) {
+    steps.push('Decompose the problem into logical primitives and dependencies');
+    steps.push('Expose unstated premises and examine underlying assumptions');
+  } else if (baseType && ['INTP', 'INTJ', 'ENTP'].includes(baseType)) {
+    steps.push('Deconstruct the system architecture and state assumptions');
+  }
+
+  if (activeIds.has('brainstorming')) {
+    steps.push('Expand the solution space with unconventional alternative approaches');
+  }
+
+  if (activeIds.has('debate')) {
+    steps.push('Pressure-test competing hypotheses and construct counterarguments');
+  }
+
+  if (activeIds.has('research')) {
+    steps.push('Separate empirically verified facts from theoretical speculation');
+  }
+
+  if (activeIds.has('troubleshooting')) {
+    steps.push('Isolate root causes and establish a minimal reproduction path');
+  }
+
+  if (activeIds.has('experimental')) {
+    steps.push('Formulate testable hypotheses and design small verification probes');
+  }
+
+  if (activeIds.has('optimization')) {
+    steps.push('Identify bottlenecks and evaluate trade-offs across speed, simplicity, and scale');
+  }
+
+  if (activeIds.has('tactical')) {
+    steps.push('Formulate immediate, concrete, hands-on action steps');
+  }
+
+  if (activeIds.has('empathy')) {
+    steps.push('Calibrate the response for human impact, emotional context, and clarity');
+  }
+
+  if (activeIds.has('structured')) {
+    steps.push('Format final solution into a structured, verifiable checklist');
+  } else {
+    steps.push('Present a reasoned, actionable conclusion');
+  }
+
+  return steps;
+}
+
+export function describeCognitiveBehavior(profile: Partial<CognitiveProfile>): string {
+  const { baseType, skills = [], communicationStyle } = profile;
+  if (!baseType) return 'Select a base profile to inspect cognitive behavior.';
+
+  const mbti = profilesByType[baseType];
+  const sortedSkills = [...skills]
+    .map((s) => ({ ...s, intensity: clampIntensity(s.intensity) }))
+    .sort((a, b) => b.intensity - a.intensity);
+
+  const dominant = sortedSkills.filter((s) => s.intensity >= 60);
+
+  let desc = `This configuration builds upon an experimental ${baseType}-inspired cognitive foundation (${mbti?.name ?? baseType}), which inherently emphasizes ${mbti?.cognitiveStyle.toLowerCase() ?? 'structured reasoning'}. `;
+
+  if (dominant.length > 0) {
+    const dominantNames = dominant
+      .map((s) => `${skillsById[s.skillId]?.name} (${s.intensity}%)`)
+      .join(', ');
+    desc += `It is strongly shaped by dominant skills: ${dominantNames}, ensuring solutions are rigorously driven by these cognitive directives. `;
+  } else {
+    desc += 'It operates primarily from base cognitive preferences without dominant skill overrides. ';
+  }
+
+  if (communicationStyle && communicationStyle in communicationStyleDescriptions) {
+    desc += `Responses are calibrated in a ${communicationStyle.toLowerCase()} manner: ${communicationStyleDescriptions[communicationStyle as CommunicationStyle]}.`;
+  }
+
+  return desc;
+}
+
+// ─── Main System Prompt Generator ────────────────────────────────────────────
+
+export function generateSystemPrompt(profile: Partial<CognitiveProfile>): string {
+  const {
+    baseType,
+    skills = [],
+    name,
+    communicationStyle,
+    communicationPreference,
+    customInstructions,
+  } = profile;
 
   if (!baseType) return '// No base profile selected yet.';
 
   const mbtiProfile = profilesByType[baseType];
   if (!mbtiProfile) return '// Invalid base profile.';
 
-  const sortedSkills = [...skills].sort((a, b) => b.intensity - a.intensity);
-  const dominantSkills = sortedSkills.filter((s) => s.intensity >= 40);
+  const profileName = name || generateCognitiveProfileName(baseType, skills);
+  const commStyle = (communicationStyle || communicationPreference || 'Balanced') as CommunicationStyle;
+  const commDescription =
+    communicationStyleDescriptions[commStyle] ||
+    (typeof commStyle === 'string' ? commStyle : 'Balanced and clear communication.');
 
-  const profileName = name || `${mbtiProfile.name} Configuration`;
+  // Sort and clamp skills
+  const sortedSkills = [...skills]
+    .map((s) => ({ ...s, intensity: clampIntensity(s.intensity) }))
+    .sort((a, b) => b.intensity - a.intensity);
 
-  const skillLines = dominantSkills
+  // Active skills breakdown with actual intensity tiers
+  const activeSkillSections = sortedSkills
     .map((si) => {
       const skill = skillsById[si.skillId];
-      return skill
-        ? `${skill.name} Skill — ${si.intensity}%\n${skillBehaviors(si)}`
-        : '';
+      if (!skill) return '';
+
+      const tier = getIntensityTier(si.intensity);
+      const behaviors = skill.behaviors
+        .slice(0, si.intensity >= 60 ? skill.behaviors.length : 3)
+        .map((b) => `  - ${tier.directiveTemplate(b)}`)
+        .join('\n');
+
+      return `### ${skill.name} Skill — ${si.intensity}% [${tier.label}]\n${behaviors}`;
     })
     .filter(Boolean)
     .join('\n\n');
 
-  const communicationSection = communicationPreference
-    ? `\nCommunication preference: ${communicationPreference}\n`
+  const workflowSteps = deriveProblemSolvingWorkflow(profile)
+    .map((step, idx) => `${idx + 1}. ${step}`)
+    .join('\n');
+
+  const customSection = customInstructions?.trim()
+    ? `\n## User Custom Instructions\n\n${customInstructions.trim()}\n`
     : '';
 
-  const customSection = customInstructions
-    ? `\nAdditional instructions:\n${customInstructions}\n`
-    : '';
+  return `# AI Cognitive Profile: ${profileName}
+# Framework: MBTI AI Skills (Open Source) — https://github.com/Imposter-zx/MBTI-AI-SKILLS
+# ─────────────────────────────────────────────────────────────────────────────
 
-  return `# AI Configuration: ${profileName}
-# Generated by MBTI AI Skills — mbti-ai-skills.github.io
-# ─────────────────────────────────────────────────────
+You are an AI configured with an experimental ${baseType}-inspired Cognitive Profile.
 
-You are an AI configured with an experimental ${baseType}-inspired cognitive profile.
+> IMPORTANT PHILOSOPHICAL NOTICE:
+> This configuration is an experimental interaction design pattern inspired by commonly described MBTI preferences.
+> It is NOT a scientific psychological diagnosis, nor does it make determinative claims about human personality, intelligence, or fixed capabilities.
+> All cognitive styles and behaviors herein are configurable software interaction patterns.
 
-## Base Profile: ${baseType} — ${mbtiProfile.name}
+## Base Profile: ${baseType} (${mbtiProfile.name})
 
-${mbtiProfile.description}
+- Category: ${mbtiProfile.category} — ${mbtiProfile.tagline}
+- Cognitive Style: ${mbtiProfile.cognitiveStyle}
+- Decision Pattern: ${mbtiProfile.decisionStyle}
 
-## Cognitive Style
+## Primary Cognitive Priorities
 
-${mbtiProfile.cognitiveStyle}
+1. Adopt the problem-framing heuristics of an experimental ${baseType}-inspired configuration.
+2. Maintain epistemic rigor: explicitly distinguish verified facts from assumptions, analogies, and speculative hypotheses.
+3. Never claim that personality dictates objective competence or universal human behavior.
 
-## Communication Style
+## Active Cognitive Skills & Weighted Intensities
 
-${mbtiProfile.communicationStyle}
+${activeSkillSections || 'Operating with base profile cognitive defaults (no secondary skills configured).'}
 
-## Problem-Solving Process
+## Communication Style & Tone
 
-${mbtiProfile.problemSolvingStyle}
+- Style: ${commStyle}
+- Directives: ${commDescription}
 
-## Decision Pattern
+## Problem-Solving Workflow
 
-${mbtiProfile.decisionStyle}
-${communicationSection}
-## Active Skills
-${dominantSkills.length > 0
-  ? `\nThe following cognitive skills are active in this configuration, ordered by intensity:\n\n${skillLines}`
-  : '\nNo specific skills configured — operating from base profile defaults.'}
+When analyzing questions, requests, or complex engineering challenges, execute the following trajectory:
 
-## Core Directives
-
-${sortedSkills.slice(0, 5).map((si, i) => {
-  const skill = skillsById[si.skillId];
-  return skill ? `${i + 1}. ${intensityLabel(si.intensity).charAt(0).toUpperCase() + intensityLabel(si.intensity).slice(1)} emphasize the ${skill.name} skill: ${skill.shortDescription}` : '';
-}).filter(Boolean).join('\n')}
-${dominantSkills.length === 0 ? `1. Follow the ${baseType} cognitive profile described above.\n2. Adapt communication to the user's context.\n3. Be clear about what is known vs. assumed.` : ''}
-
-## Important Disclaimer
-
-Do not present MBTI characteristics as scientific facts or fixed traits. This configuration is an experimental AI interaction design pattern — not a psychological diagnosis or scientific measure of capability. Treat all profile descriptions as configurable defaults, not rigid rules.
+${workflowSteps}
 ${customSection}
-# ─────────────────────────────────────────────────────
-# End of configuration`;
+# ─────────────────────────────────────────────────────────────────────────────
+# End of System Prompt`;
 }
 
-// ─── Token estimator (rough approximation) ───────────────────────────────────
+// ─── Token Estimator ─────────────────────────────────────────────────────────
 
 export function estimateTokens(text: string): number {
-  // Rough approximation: ~4 chars per token
   return Math.ceil(text.length / 4);
 }

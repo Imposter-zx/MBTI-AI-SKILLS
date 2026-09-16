@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "typecheck": "tsc -b",
+    "lint": "tsc -b",
+    "test": "npx tsx scripts/verify-framework.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
