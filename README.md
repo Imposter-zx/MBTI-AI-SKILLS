@@ -1,0 +1,1 @@
+# MBTI-AI-SKILLS
