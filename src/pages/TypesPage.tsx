@@ -6,6 +6,7 @@ import { mbtiProfiles } from '../data/mbtiProfiles';
 import { skillsById } from '../data/skills';
 import { GlowCard } from '../components/shared/GlowCard';
 import { Badge } from '../components/shared/Badge';
+import { useI18n } from '../i18n';
 import type { MBTICategory } from '../types';
 
 const categoryColors: Record<MBTICategory, 'cyan' | 'purple' | 'amber' | 'green'> = {
@@ -23,9 +24,11 @@ const categoryDescriptions: Record<MBTICategory, string> = {
 };
 
 export function TypesPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<MBTICategory | 'All'>('All');
 
+  const allLabel = t('types.all');
   const categories: Array<MBTICategory | 'All'> = ['All', 'Analysts', 'Diplomats', 'Sentinels', 'Explorers'];
 
   const filtered = mbtiProfiles.filter((p) => {
@@ -35,7 +38,7 @@ export function TypesPage() {
       p.type.toLowerCase().includes(search.toLowerCase()) ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.description.toLowerCase().includes(search.toLowerCase()) ||
-      p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+      p.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
@@ -53,12 +56,9 @@ export function TypesPage() {
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold text-slate-100 mb-3">
-            Explore <span className="gradient-text">16 AI Profiles</span>
+            <span className="gradient-text">{t('types.heading')}</span>
           </h1>
-          <p className="text-slate-500 text-lg max-w-2xl">
-            Each profile is an experimental AI interaction style inspired by MBTI cognitive
-            preferences. Not personality science — configurable design patterns.
-          </p>
+          <p className="text-slate-500 text-lg max-w-2xl">{t('types.subheading')}</p>
         </div>
 
         {/* Filters */}
@@ -68,11 +68,11 @@ export function TypesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              placeholder="Search profiles..."
+              placeholder={t('types.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-300 placeholder-slate-600 text-sm focus:outline-none focus:border-cyan-500/40 focus:bg-white/8 transition-all"
-              aria-label="Search profiles"
+              aria-label={t('types.search')}
             />
           </div>
 
@@ -88,7 +88,7 @@ export function TypesPage() {
                     : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent'
                 }`}
               >
-                {cat}
+                {cat === 'All' ? allLabel : cat}
               </button>
             ))}
           </div>
@@ -153,7 +153,7 @@ export function TypesPage() {
 
                       {/* View button */}
                       <div className="flex items-center gap-1 text-xs text-slate-500 group-hover:text-cyan-400 transition-colors">
-                        View Profile
+                        {t('types.viewProfile')}
                         <ArrowRight className="w-3 h-3" />
                       </div>
                     </GlowCard>
@@ -166,7 +166,7 @@ export function TypesPage() {
 
         {filtered.length === 0 && (
           <div className="text-center py-20 text-slate-600">
-            No profiles match your search.
+            {t('types.noResults')}
           </div>
         )}
       </div>

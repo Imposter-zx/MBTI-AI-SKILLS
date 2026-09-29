@@ -2,8 +2,11 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Home, Compass, Wrench } from 'lucide-react';
 import { Button } from '../components/shared/Button';
+import { useI18n } from '../i18n';
 
 export function NotFoundPage() {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen pt-32 pb-20 px-4 flex items-center justify-center">
       <div className="max-w-md w-full text-center">
@@ -32,30 +35,29 @@ export function NotFoundPage() {
             404
           </div>
           <h1 className="text-2xl font-bold text-slate-200 mb-3">
-            Cognitive Dead-End
+            {t('404.title')}
           </h1>
           <p className="text-slate-500 leading-relaxed mb-8">
-            The neural path you're looking for doesn't exist in this framework.
-            Try reorienting your cognitive map.
+            {t('404.body')}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link to="/">
               <Button size="lg">
                 <Home className="w-4 h-4" />
-                Return Home
+                {t('404.home')}
               </Button>
             </Link>
             <Link to="/types">
               <Button variant="secondary" size="lg">
                 <Compass className="w-4 h-4" />
-                Explore Types
+                {t('404.explore')}
               </Button>
             </Link>
             <Link to="/builder">
               <Button variant="ghost" size="lg">
                 <Wrench className="w-4 h-4" />
-                Open Builder
+                {t('404.builder')}
               </Button>
             </Link>
           </div>

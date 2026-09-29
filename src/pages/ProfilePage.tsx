@@ -17,6 +17,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Badge } from '../components/shared/Badge';
 import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
+import { useI18n } from '../i18n';
 import type { SkillId } from '../types';
 
 const categoryColors: Record<string, 'cyan' | 'purple' | 'amber' | 'green'> = {
@@ -56,6 +57,7 @@ function Section({
 export function ProfilePage() {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { setBuilderBaseType, addBuilderSkill, resetBuilder } = useAppStore();
 
   const profile = profilesByType[type?.toUpperCase() ?? ''];
@@ -63,7 +65,7 @@ export function ProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen pt-32 flex items-center justify-center text-slate-500">
-        Profile not found. <Link to="/types" className="text-cyan-400 ml-2">Browse all types →</Link>
+        Profile not found. <Link to="/types" className="text-cyan-400 ml-2">{t('profile.back')} →</Link>
       </div>
     );
   }
@@ -91,7 +93,7 @@ export function ProfilePage() {
           className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-sm mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          All Profiles
+          {t('profile.back')}
         </Link>
 
         {/* Hero */}
@@ -127,12 +129,12 @@ export function ProfilePage() {
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleTryInBuilder}>
               <Zap className="w-4 h-4" />
-              Try in Builder
+              {t('profile.tryBuilder')}
             </Button>
             <Link to={`/compare?types=${profile.type}`}>
               <Button variant="secondary">
                 <Eye className="w-4 h-4" />
-                Compare This Profile
+                {t('profile.compare')}
               </Button>
             </Link>
           </div>
@@ -141,21 +143,21 @@ export function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           {/* Cognitive Style */}
           <GlowCard className="p-5">
-            <Section icon={Brain} title="Cognitive Style">
+            <Section icon={Brain} title={t('profile.cognitiveStyle')}>
               <p className="text-slate-400 text-sm leading-relaxed">{profile.cognitiveStyle}</p>
             </Section>
           </GlowCard>
 
           {/* Communication */}
           <GlowCard className="p-5">
-            <Section icon={MessageSquare} title="Communication Style">
+            <Section icon={MessageSquare} title={t('profile.communication')}>
               <p className="text-slate-400 text-sm leading-relaxed">{profile.communicationStyle}</p>
             </Section>
           </GlowCard>
 
           {/* Problem Solving */}
           <GlowCard className="p-5">
-            <Section icon={Target} title="Problem-Solving Process">
+            <Section icon={Target} title={t('profile.problemSolving')}>
               <div className="flex flex-wrap items-center gap-2">
                 {profile.problemSolvingStyle.split('→').map((step, i, arr) => (
                   <div key={i} className="flex items-center gap-2">
@@ -171,7 +173,7 @@ export function ProfilePage() {
 
           {/* Decision Style */}
           <GlowCard className="p-5">
-            <Section icon={Zap} title="Decision Pattern">
+            <Section icon={Zap} title={t('profile.decision')}>
               <p className="text-slate-400 text-sm leading-relaxed">{profile.decisionStyle}</p>
             </Section>
           </GlowCard>
@@ -181,7 +183,7 @@ export function ProfilePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
           <GlowCard className="p-5">
             <h3 className="text-sm font-semibold text-green-400 mb-3 uppercase tracking-wider">
-              Strength-Oriented Tendencies
+              {t('profile.strengths')}
             </h3>
             <ul className="space-y-2">
               {profile.strengths.map((s) => (
@@ -195,7 +197,7 @@ export function ProfilePage() {
 
           <GlowCard className="p-5">
             <h3 className="text-sm font-semibold text-amber-400 mb-3 uppercase tracking-wider">
-              Possible Blind Spots
+              {t('profile.blindSpots')}
             </h3>
             <ul className="space-y-2">
               {profile.blindSpots.map((s) => (
@@ -211,7 +213,7 @@ export function ProfilePage() {
         {/* Recommended Skills */}
         <div className="mb-10">
           <h2 className="text-xl font-bold text-slate-200 mb-5">
-            Recommended AI Skills
+            {t('profile.recommendedSkills')}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {profile.recommendedSkills.map((sid, i) => {
@@ -241,7 +243,7 @@ export function ProfilePage() {
                           className="text-cyan-400 hover:text-cyan-300"
                         >
                           <Plus className="w-3 h-3" />
-                          Add to Builder
+                          {t('profile.addToBuilder')}
                         </Button>
                       </div>
                     </div>
@@ -254,7 +256,7 @@ export function ProfilePage() {
 
         {/* Example System Prompt */}
         <div className="mb-10">
-          <h2 className="text-xl font-bold text-slate-200 mb-4">Example System Prompt</h2>
+          <h2 className="text-xl font-bold text-slate-200 mb-4">{t('profile.examplePrompt')}</h2>
           <div className="rounded-xl border border-white/8 bg-[#0d1421] p-4">
             <pre className="font-mono text-xs text-slate-400 whitespace-pre-wrap leading-relaxed">
               {profile.examplePrompt}
@@ -265,16 +267,16 @@ export function ProfilePage() {
         {/* Example interactions */}
         {profile.exampleInteractions.length > 0 && (
           <div className="mb-10">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">Example Interaction</h2>
+            <h2 className="text-xl font-bold text-slate-200 mb-4">{t('profile.exampleInteraction')}</h2>
             {profile.exampleInteractions.map((ex, i) => (
               <GlowCard key={i} className="p-5">
                 <div className="mb-4">
-                  <span className="text-xs text-slate-500 font-mono">USER</span>
+                  <span className="text-xs text-slate-500 font-mono">{t('profile.user')}</span>
                   <p className="text-slate-300 mt-1 italic">"{ex.problem}"</p>
                 </div>
 
                 <div className="mb-4">
-                  <span className="text-xs text-slate-500 font-mono">APPROACH</span>
+                  <span className="text-xs text-slate-500 font-mono">{t('profile.approach')}</span>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     {ex.approach.map((step, si, arr) => (
                       <div key={si} className="flex items-center gap-2">
@@ -296,9 +298,9 @@ export function ProfilePage() {
           </div>
         )}
 
-        {/* All skills from this category that are compatible */}
+        {/* All compatible skills */}
         <div className="mb-10">
-          <h2 className="text-xl font-bold text-slate-200 mb-4">All Compatible Skills</h2>
+          <h2 className="text-xl font-bold text-slate-200 mb-4">{t('profile.compatibleSkills')}</h2>
           <div className="flex flex-wrap gap-2">
             {skills
               .filter((s) => s.compatibleProfiles.includes(profile.type))

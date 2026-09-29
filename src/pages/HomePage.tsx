@@ -17,6 +17,7 @@ import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
 import { Badge } from '../components/shared/Badge';
 import { skillsById } from '../data/skills';
+import { useI18n } from '../i18n';
 
 const categories = ['Analysts', 'Diplomats', 'Sentinels', 'Explorers'];
 
@@ -27,70 +28,72 @@ const categoryColors: Record<string, 'cyan' | 'purple' | 'amber' | 'green'> = {
   Explorers: 'green',
 };
 
-const features = [
-  {
-    icon: Brain,
-    title: '16 AI Profiles',
-    description: 'Explore all 16 MBTI-inspired cognitive interaction styles, each with unique Skills and behaviors.',
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-    link: '/types',
-  },
-  {
-    icon: Layers,
-    title: '12 Modular Skills',
-    description: 'Compose reusable cognitive Skills — Analytical, Tactical, Creative, Strategic and more.',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-    link: '/builder',
-  },
-  {
-    icon: GitCompare,
-    title: 'Compare Profiles',
-    description: 'See how different AI configurations approach the same problem side-by-side.',
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-    link: '/compare',
-  },
-  {
-    icon: Wrench,
-    title: 'Build Your AI Mind',
-    description: 'Combine a base profile with custom Skills and intensities to generate a system prompt.',
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-    link: '/builder',
-  },
-];
-
-const flow = [
-  { label: 'MBTI Profile', icon: Brain },
-  { label: 'Cognitive Style', icon: Sparkles },
-  { label: 'AI Skills', icon: Layers },
-  { label: 'Skill Intensity', icon: Zap },
-  { label: 'System Prompt', icon: Wrench },
-  { label: 'AI Behavior', icon: FlaskConical },
-];
-
 function SurpriseButton() {
+  const { t } = useI18n();
   const { setBuilderBaseType, resetBuilder } = useAppStore();
 
   const handleSurprise = () => {
     const randomProfile = mbtiProfiles[Math.floor(Math.random() * mbtiProfiles.length)];
     resetBuilder();
     setBuilderBaseType(randomProfile.type);
-    // Navigate to builder
     window.location.href = `${import.meta.env.BASE_URL}builder`.replace('//', '/');
   };
 
   return (
     <Button variant="secondary" size="lg" onClick={handleSurprise}>
       <Shuffle className="w-5 h-5" />
-      Surprise Me
+      {t('home.cta.surprise')}
     </Button>
   );
 }
 
 export function HomePage() {
+  const { t } = useI18n();
+
+  const flow = [
+    { label: t('home.flow.profile'), icon: Brain },
+    { label: t('home.flow.style'),   icon: Sparkles },
+    { label: t('home.flow.skills'),  icon: Layers },
+    { label: t('home.flow.intensity'), icon: Zap },
+    { label: t('home.flow.prompt'),  icon: Wrench },
+    { label: t('home.flow.behavior'), icon: FlaskConical },
+  ];
+
+  const features = [
+    {
+      icon: Brain,
+      title: t('feature.profiles.title'),
+      description: t('feature.profiles.desc'),
+      color: 'text-cyan-400',
+      bg: 'bg-cyan-500/10',
+      link: '/types',
+    },
+    {
+      icon: Layers,
+      title: t('feature.skills.title'),
+      description: t('feature.skills.desc'),
+      color: 'text-purple-400',
+      bg: 'bg-purple-500/10',
+      link: '/builder',
+    },
+    {
+      icon: GitCompare,
+      title: t('feature.compare.title'),
+      description: t('feature.compare.desc'),
+      color: 'text-green-400',
+      bg: 'bg-green-500/10',
+      link: '/compare',
+    },
+    {
+      icon: Wrench,
+      title: t('feature.builder.title'),
+      description: t('feature.builder.desc'),
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10',
+      link: '/builder',
+    },
+  ];
+
   return (
     <div className="min-h-screen">
       {/* Hero */}
@@ -107,7 +110,7 @@ export function HomePage() {
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/5 text-cyan-400 text-xs font-medium mb-6">
               <Sparkles className="w-3 h-3" />
-              Experimental AI Framework — v0.1
+              {t('home.badge')}
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
@@ -115,31 +118,30 @@ export function HomePage() {
             </h1>
 
             <p className="text-2xl sm:text-3xl text-slate-300 font-light mb-4">
-              Build the way your AI thinks.
+              {t('home.tagline')}
             </p>
 
             <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Explore 16 AI interaction profiles, experiment with modular cognitive Skills, and build
-              your own AI thinking configuration — all without writing a single line of code.
+              {t('home.subtitle')}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Link to="/types">
                 <Button size="lg">
                   <Brain className="w-5 h-5" />
-                  Explore 16 Types
+                  {t('home.cta.explore')}
                 </Button>
               </Link>
               <Link to="/builder">
                 <Button variant="secondary" size="lg">
                   <Wrench className="w-5 h-5" />
-                  Build Your AI
+                  {t('home.cta.build')}
                 </Button>
               </Link>
               <Link to="/compare">
                 <Button variant="ghost" size="lg">
                   <GitCompare className="w-5 h-5" />
-                  Compare Profiles
+                  {t('home.cta.compare')}
                 </Button>
               </Link>
               <SurpriseButton />
@@ -180,11 +182,9 @@ export function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-slate-100 mb-3">
-              One framework. Four capabilities.
+              {t('home.features.title')}
             </h2>
-            <p className="text-slate-500">
-              Everything you need to explore, compare, and build AI cognitive profiles.
-            </p>
+            <p className="text-slate-500">{t('home.features.subtitle')}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, i) => (
@@ -217,12 +217,12 @@ export function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-slate-100 mb-1">All 16 Profiles</h2>
-              <p className="text-slate-500 text-sm">Choose your cognitive starting point.</p>
+              <h2 className="text-2xl font-bold text-slate-100 mb-1">{t('home.profiles.title')}</h2>
+              <p className="text-slate-500 text-sm">{t('home.profiles.subtitle')}</p>
             </div>
             <Link to="/types">
               <Button variant="secondary" size="sm">
-                View All
+                {t('home.profiles.viewAll')}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
@@ -287,12 +287,11 @@ export function HomePage() {
             <div className="flex gap-3">
               <div className="text-amber-400 flex-shrink-0 mt-0.5">⚠</div>
               <div>
-                <h3 className="text-sm font-semibold text-amber-400 mb-1">Research Disclaimer</h3>
+                <h3 className="text-sm font-semibold text-amber-400 mb-1">
+                  {t('home.disclaimer.title')}
+                </h3>
                 <p className="text-sm text-slate-500 leading-relaxed">
-                  MBTI AI Skills is an experimental framework for exploring AI interaction styles.
-                  MBTI should not be treated as a scientifically validated measure of intelligence,
-                  personality capability, or professional aptitude. The profiles in this project are
-                  configurable design patterns, not psychological diagnoses.
+                  {t('home.disclaimer.body')}
                 </p>
               </div>
             </div>
