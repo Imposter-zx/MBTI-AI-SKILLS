@@ -1,4 +1,4 @@
-# MBTI AI Skills — V1.1
+# MBTI AI Skills — V1.2
 
 > **Build the way your AI thinks.**
 
@@ -7,6 +7,7 @@ An open-source cognitive framework for composing, testing, and comparing modular
 [![License: MIT](https://img.shields.io/badge/License-MIT-cyan.svg)](https://opensource.org/licenses/MIT)
 [![Deploy to GitHub Pages](https://github.com/Imposter-zx/MBTI-AI-SKILLS/actions/workflows/deploy.yml/badge.svg)](https://github.com/Imposter-zx/MBTI-AI-SKILLS/actions/workflows/deploy.yml)
 [![Built with Vite + React + TS](https://img.shields.io/badge/Stack-React%20%7C%20TypeScript%20%7C%20Vite%20%7C%20Tailwind-blue)](https://vitejs.dev)
+[![Multi-Language](https://img.shields.io/badge/i18n-8%20Languages-green)](https://github.com/Imposter-zx/MBTI-AI-SKILLS)
 
 ---
 
@@ -18,8 +19,8 @@ An open-source cognitive framework for composing, testing, and comparing modular
 - [Central Architecture Workflow](#central-architecture-workflow)
 - [The 16 MBTI-Inspired Base Profiles](#the-16-mbti-inspired-base-profiles)
 - [12 Modular Cognitive Skills](#12-modular-cognitive-skills)
-- [Cognitive Profiles — The V1.1 System](#cognitive-profiles--the-v11-system)
 - [Continuous Skill Intensity Engine](#continuous-skill-intensity-engine)
+- [Cognitive Profiles — The V1.1 System](#cognitive-profiles--the-v11-system)
 - [Compare Lab](#compare-lab)
 - [Test Lab (Rule-Based Simulation)](#test-lab-rule-based-simulation)
 - [System Prompt Generation & Token Estimation](#system-prompt-generation--token-estimation)
@@ -28,6 +29,7 @@ An open-source cognitive framework for composing, testing, and comparing modular
 - [Community Skills Guide](#community-skills-guide)
 - [Installation & Verification Pipeline](#installation--verification-pipeline)
 - [GitHub Pages Deployment](#github-pages-deployment)
+- [Multi-Language Support](#multi-language-support)
 - [Project Roadmap](#project-roadmap)
 - [License](#license)
 
@@ -301,8 +303,33 @@ Configured via `.github/workflows/deploy.yml`:
   - 8 communication postures (Concise, Balanced, Detailed, Technical, Simple, Socratic, Direct, Exploratory).
   - Multi-profile comparison (compare custom cognitive profiles side-by-side).
   - Versioned schema, corruption resilience, and automated verification suite.
-- [ ] **v1.2 — Community Registry**: Dynamic GitHub API loader for community skills.
+- [x] **v1.2 — Multi-Language & Performance**:
+  - 8 languages: English, French, Arabic (RTL), Spanish, German, Chinese, Portuguese, Japanese.
+  - Code splitting via React lazy + Suspense (bundle from 1.3MB monolith → multiple small chunks).
+  - Proper 404 page, language auto-detection from browser, persisted language preference.
+- [ ] **v1.3 — Community Registry**: Dynamic GitHub API loader for community skills.
 - [ ] **v2.0 — CLI & Multi-Agent Export**: `npx mbti-ai-skills export --target langchain|crewai|claude`.
+
+---
+
+## 🌍 Multi-Language Support
+
+The interface supports 8 languages, auto-detected from browser preferences:
+
+| Language | Code | Direction |
+| :--- | :--- | :--- |
+| 🇬🇧 English | `en` | LTR |
+| 🇫🇷 Français | `fr` | LTR |
+| 🇲🇦 العربية | `ar` | **RTL** |
+| 🇪🇸 Español | `es` | LTR |
+| 🇩🇪 Deutsch | `de` | LTR |
+| 🇨🇳 中文 | `zh` | LTR |
+| 🇧🇷 Português | `pt` | LTR |
+| 🇯🇵 日本語 | `ja` | LTR |
+
+Language is selected via the flag picker in the top navigation bar and persisted to `localStorage`. The `html[dir]` attribute is automatically set to `rtl` for Arabic.
+
+To contribute a new language: copy `src/i18n/locales/en.ts`, translate all values, add the entry to `src/i18n/types.ts` and `src/i18n/index.tsx`.
 
 ---
 

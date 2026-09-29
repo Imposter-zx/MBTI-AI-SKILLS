@@ -4,17 +4,20 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { GithubIcon } from '../shared/GithubIcon';
-
-const navLinks = [
-  { to: '/types', label: 'Explore Types' },
-  { to: '/compare', label: 'Compare' },
-  { to: '/builder', label: 'AI Mind Builder' },
-  { to: '/lab', label: 'Test Lab' },
-];
+import { LanguagePicker } from '../shared/LanguagePicker';
+import { useI18n } from '../../i18n';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
+  const { t } = useI18n();
+
+  const navLinks = [
+    { to: '/types',   label: t('nav.types') },
+    { to: '/compare', label: t('nav.compare') },
+    { to: '/builder', label: t('nav.builder') },
+    { to: '/lab',     label: t('nav.lab') },
+  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5">
@@ -52,17 +55,21 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* GitHub button + mobile toggle */}
-        <div className="flex items-center gap-3">
+        {/* Right side: Language picker + GitHub + mobile toggle */}
+        <div className="flex items-center gap-2">
+          {/* Language picker */}
+          <LanguagePicker />
+
+          {/* GitHub button */}
           <a
-            href="https://github.com/mbti-ai-skills/mbti-ai-skills"
+            href="https://github.com/Imposter-zx/MBTI-AI-SKILLS"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all border border-white/5 hover:border-white/10"
             aria-label="View on GitHub"
           >
             <GithubIcon className="w-4 h-4" />
-            <span className="hidden lg:inline">GitHub</span>
+            <span className="hidden lg:inline">{t('nav.github')}</span>
           </a>
 
           {/* Mobile toggle */}
@@ -103,13 +110,13 @@ export function Navbar() {
                 </Link>
               ))}
               <a
-                href="https://github.com/mbti-ai-skills/mbti-ai-skills"
+                href="https://github.com/Imposter-zx/MBTI-AI-SKILLS"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all"
               >
                 <GithubIcon className="w-4 h-4" />
-                GitHub
+                {t('nav.github')}
               </a>
             </div>
           </motion.div>
