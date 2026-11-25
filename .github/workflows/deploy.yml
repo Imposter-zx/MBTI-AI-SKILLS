@@ -32,7 +32,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Run framework tests
+        run: npm test
 
       - name: Build project for GitHub Pages
         run: npm run build
