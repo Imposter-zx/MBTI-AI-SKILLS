@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -9,16 +10,27 @@ import {
   Eye,
   ArrowRight,
   Plus,
+  Download,
+  Copy,
+  CheckCheck,
+  Package,
+  ExternalLink,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { profilesByType } from '../data/mbtiProfiles';
 import { skills, skillsById } from '../data/skills';
+import {
+  buildSkillPackZip,
+  buildSkillZip,
+  generateSkillMarkdown,
+  generateSkillPackMarkdown,
+} from '../engine/skillExporter';
 import { useAppStore } from '../store/useAppStore';
 import { Badge } from '../components/shared/Badge';
 import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
 import { useI18n } from '../i18n';
-import type { SkillId } from '../types';
+import type { Skill, SkillId } from '../types';
 
 const categoryColors: Record<string, 'cyan' | 'purple' | 'amber' | 'green'> = {
   Analysts: 'cyan',
@@ -59,6 +71,9 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { setBuilderBaseType, addBuilderSkill, resetBuilder } = useAppStore();
+  const [copiedPack, setCopiedPack] = useState(false);
+  const [downloadingPack, setDownloadingPack] = useState(false);
+  const [downloadingSkillId, setDownloadingSkillId] = useState<string | null>(null);
 
   const profile = profilesByType[type?.toUpperCase() ?? ''];
 
@@ -82,6 +97,49 @@ export function ProfilePage() {
     setBuilderBaseType(profile.type);
     addBuilderSkill(skillId);
     navigate('/builder');
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPackZip = async () => {
+    if (downloadingPack) return;
+    setDownloadingPack(true);
+    try {
+      const blob = await buildSkillPackZip(profile.type);
+      downloadBlob(blob, `${profile.type.toLowerCase()}-skill-pack.zip`);
+    } finally {
+      setDownloadingPack(false);
+    }
+  };
+
+  const handleCopyPackMarkdown = async () => {
+    const md = generateSkillPackMarkdown(profile.type);
+    await navigator.clipboard.writeText(md);
+    setCopiedPack(true);
+    setTimeout(() => setCopiedPack(false), 2500);
+  };
+
+  const handleDownloadSkillMd = (skill: Skill) => {
+    const md = generateSkillMarkdown(skill);
+    downloadBlob(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${skill.id}-SKILL.md`);
+  };
+
+  const handleDownloadSkillZip = async (skill: Skill) => {
+    if (downloadingSkillId) return;
+    setDownloadingSkillId(skill.id);
+    try {
+      const blob = await buildSkillZip(skill);
+      downloadBlob(blob, `${skill.id}-skill.zip`);
+    } finally {
+      setDownloadingSkillId(null);
+    }
   };
 
   return (
@@ -210,6 +268,42 @@ export function ProfilePage() {
           </GlowCard>
         </div>
 
+        {/* Experimental Skill Pack */}
+        <GlowCard className="p-5 mb-10 border-cyan-500/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="w-4 h-4 text-cyan-400" />
+                <h2 className="text-base font-bold text-slate-100">
+                  {profile.type} Experimental Skill Pack
+                </h2>
+                <Badge color="cyan">Portable</Badge>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Bundle of {profile.recommendedSkills.length} modular cognitive skills inspired by {profile.type}. Experimental interaction pattern — not a psychological diagnosis.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                onClick={handleDownloadPackZip}
+                disabled={downloadingPack}
+              >
+                <Download className="w-3.5 h-3.5" />
+                {downloadingPack ? 'Building ZIP…' : 'Download Pack ZIP'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCopyPackMarkdown}
+              >
+                {copiedPack ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedPack ? 'Copied!' : 'Copy Pack Markdown'}
+              </Button>
+            </div>
+          </div>
+        </GlowCard>
+
         {/* Recommended Skills */}
         <div className="mb-10">
           <h2 className="text-xl font-bold text-slate-200 mb-5">
@@ -232,19 +326,46 @@ export function ProfilePage() {
                         <DynamicIcon name={skill.icon} className="w-4 h-4 text-cyan-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-slate-200 text-sm mb-1">{skill.name} Skill</div>
+                        <Link
+                          to={`/skills/${skill.id}`}
+                          className="inline-flex items-center gap-1.5 font-semibold text-slate-200 hover:text-cyan-300 text-sm mb-1 transition-colors"
+                        >
+                          {skill.name} Skill
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                        </Link>
                         <p className="text-xs text-slate-500 leading-relaxed mb-3">
                           {skill.shortDescription}
                         </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleAddSkill(sid)}
-                          className="text-cyan-400 hover:text-cyan-300"
-                        >
-                          <Plus className="w-3 h-3" />
-                          {t('profile.addToBuilder')}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddSkill(sid)}
+                            className="text-cyan-400 hover:text-cyan-300"
+                          >
+                            <Plus className="w-3 h-3" />
+                            {t('profile.addToBuilder')}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadSkillMd(skill)}
+                            className="text-slate-400 hover:text-slate-200"
+                          >
+                            <Download className="w-3 h-3" />
+                            SKILL.md
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadSkillZip(skill)}
+                            disabled={downloadingSkillId === skill.id}
+                            className="text-slate-400 hover:text-slate-200"
+                          >
+                            <Package className="w-3 h-3" />
+                            {downloadingSkillId === skill.id ? '…' : 'ZIP'}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </GlowCard>

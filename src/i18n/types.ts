@@ -26,9 +26,11 @@ export const DEFAULT_LANG: LangCode = 'en';
 export interface Translations {
   // Navbar
   'nav.types': string;
+  'nav.skills': string;
   'nav.compare': string;
   'nav.builder': string;
   'nav.lab': string;
+  'nav.compatibility': string;
   'nav.github': string;
 
   // HomePage

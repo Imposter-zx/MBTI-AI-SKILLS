@@ -2,9 +2,11 @@ import type { Translations } from '../types';
 
 export const fr: Translations = {
   'nav.types': 'Explorer les types',
+  'nav.skills': 'Bibliothèque de compétences',
   'nav.compare': 'Comparer',
   'nav.builder': 'Constructeur IA',
   'nav.lab': 'Laboratoire',
+  'nav.compatibility': 'Compatibilité',
   'nav.github': 'GitHub',
 
   'home.badge': 'Framework IA expérimental — v1.2',

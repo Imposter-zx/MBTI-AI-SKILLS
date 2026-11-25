@@ -19,6 +19,12 @@ An open-source cognitive framework for composing, testing, and comparing modular
 - [Central Architecture Workflow](#central-architecture-workflow)
 - [The 16 MBTI-Inspired Base Profiles](#the-16-mbti-inspired-base-profiles)
 - [12 Modular Cognitive Skills](#12-modular-cognitive-skills)
+- [Portable AI Skills](#portable-ai-skills)
+- [Download Skills](#download-skills)
+- [MBTI Skill Packs](#mbti-skill-packs)
+- [Build Your Cognitive Profile](#build-your-cognitive-profile)
+- [Compatibility](#compatibility)
+- [Skill Format](#skill-format)
 - [Continuous Skill Intensity Engine](#continuous-skill-intensity-engine)
 - [Compare Lab](#compare-lab-compare)
 - [Test Lab (Rule-Based Simulation)](#test-lab-rule-based-simulation)
@@ -26,6 +32,7 @@ An open-source cognitive framework for composing, testing, and comparing modular
 - [Serialization & URL Sharing](#serialization--url-sharing)
 - [AI Provider Architecture](#ai-provider-architecture)
 - [Community Skills Guide](#community-skills-guide)
+- [Repository Structure](#repository-structure)
 - [Installation & Verification Pipeline](#installation--verification-pipeline)
 - [GitHub Pages Deployment](#github-pages-deployment)
 - [Multi-Language Support](#multi-language-support)
@@ -149,6 +156,116 @@ Skills are independent from MBTI. Any profile can be augmented with any combinat
 
 ---
 
+## 📦 Portable AI Skills
+
+Every skill in **MBTI AI Skills V1.2** is packaged as a **portable, standalone AI instruction file** that can be downloaded and reused outside the website—across local editors, CLI agents, custom GPTs, Claude Projects, Gemini Gems, or any LLM workflow.
+
+- **Pre-built on disk**: All 12 core skills live in [`portable-skills/`](portable-skills/README.md) as `<skill-id>/SKILL.md`.
+- **In-app Universal Library (`/skills`)**: Browse, filter, preview, copy, and download individual skills, full skill packs, or build your own custom portable `SKILL.md`.
+- **No lock-in**: Exported skills are plain UTF-8 Markdown with YAML frontmatter—no proprietary runtime or backend required.
+
+---
+
+## ⬇️ Download Skills
+
+From the **Skills Library** (`/skills`) or any skill detail page (`/skills/:id`), you can export skills in three formats:
+
+1. **Individual `SKILL.md`** — Copy to clipboard or download `<id>.md` directly for immediate pasting into system prompts or project instructions.
+2. **Individual Skill ZIP** — Downloads `<id>.zip` containing:
+   - `<id>/SKILL.md` — Portable skill definition with YAML frontmatter
+   - `<id>/README.md` — Skill overview, tags, and compatible experimental profiles
+   - `<id>/examples/example-1.md` — Sample application scenario
+3. **Download All Skills (`mbti-ai-skills-library.zip`)** — Downloads the complete library bundle containing a root `README.md` and `skills/<id>/SKILL.md` + `skills/<id>/README.md` for all 12 built-in skills.
+
+---
+
+## 🧩 MBTI Skill Packs
+
+**MBTI Skill Packs** (`/skills`) group each of the **16 MBTI-inspired base profiles** with its recommended cognitive skills into a single downloadable collection.
+
+> [!NOTE]
+> MBTI Skill Packs are **experimental profile collections** designed as starting points for AI interaction patterns—they are **not** fixed psychological facts or scientific claims about human personality.
+
+Each Skill Pack (`<TYPE>-skill-pack.zip`, e.g., `INTP-skill-pack.zip`) includes:
+- `README.md` — Pack overview, cognitive stance, included skills, and base prompt template
+- `pack.json` — Machine-readable pack metadata (`schema: "mbti-ai-skills-pack/v1"`, `experimental: true`, `type`, `skills`)
+- `skills/<id>/SKILL.md` — Individual portable `SKILL.md` files for every recommended skill in the pack
+
+---
+
+## 🛠️ Build Your Cognitive Profile
+
+In the **Cognitive Profile Builder** (`/builder`), you can compose a custom profile by combining:
+- One of the **16 MBTI-inspired base profiles**
+- Any mix of **modular skills** with continuous **0–100% intensity sliders**
+- One of **8 communication styles**
+- Optional **custom instructions**
+
+Once configured, you can export your Cognitive Profile in four ways:
+1. **System Prompt** — Copy the dynamically generated prompt text for immediate LLM use.
+2. **JSON (`.json`)** — Export and re-import versioned profile configurations (`mbti-ai-skills/v1.1`).
+3. **Markdown (`SKILL.md`)** — Download or copy your profile as a standalone portable `SKILL.md` file.
+4. **Portable Skill ZIP** — Download `<profile-slug>.zip` containing `<slug>/SKILL.md`, `<slug>/profile.json` (re-importable in the Builder), and `<slug>/README.md`.
+
+---
+
+## 🔌 Compatibility
+
+Compatibility depends on how each AI tool loads instructions—**this project does not claim universal native `SKILL.md` compatibility**.
+
+- **Manual Usage (Verified)**: Because every `SKILL.md` is standard UTF-8 Markdown, you can copy and paste the instructions into ChatGPT (Custom Instructions / Custom GPTs), Claude (Projects / chat), Gemini (Gems / AI Studio), or any LLM API / local runner (Ollama, LM Studio, Open WebUI).
+- **Native Skill Support & Tool-Specific Rules**: Some coding agents and editors support native skill directories or tool-specific rule files, which vary by tool and version. Unverified native discovery paths are explicitly marked **`Compatibility not verified`**.
+
+For full details and step-by-step instructions, see:
+- [`docs/compatibility.md`](docs/compatibility.md) — Tool Compatibility Matrix (Claude Code, Claude, ChatGPT, Gemini, Cursor, VS Code, OpenCode, Codex, Generic Markdown tools)
+- [`docs/installation.md`](docs/installation.md) — Method 1 (Native Skill Support) vs. Method 2 (Manual Usage)
+
+---
+
+## 📝 Skill Format
+
+Every portable skill follows a clean `SKILL.md` structure combining **YAML frontmatter** (`name`, `description`) with **structured Markdown sections**:
+
+```markdown
+---
+name: "analytical"
+description: "Decompose problems, identify assumptions, build logical explanations."
+---
+
+# Analytical Skill
+
+## Purpose
+Break complex problems into logical components, question underlying assumptions, and construct rigorous, step-by-step explanations.
+
+## When to Use
+- Evaluating complex technical architectures, specifications, or designs
+- Auditing arguments or reasoning for hidden flaws or contradictions
+
+## Behavioral Guidelines
+- Decompose every problem into its logical components before attempting a synthesis.
+- Clearly distinguish what is known with evidence from what is inferred or speculated.
+
+## Workflow
+1. Define the Problem
+2. Decompose into sub-problems
+3. Surface Assumptions
+4. Evaluate Hypotheses
+5. Synthesize
+
+## Output Expectations
+- Structured breakdown with explicit comparison of competing hypotheses.
+
+## Limitations
+- Can over-analyze simple or urgent tasks where fast action matters more than exhaustive logic.
+
+## Example
+Sample prompt and expected structured response.
+```
+
+You can also author your own portable skills in the **Custom Skill Builder** (`/skills/new`) and export them as sanitized `SKILL.md` files or `.zip` packages.
+
+---
+
 ## 🎛️ Continuous Skill Intensity Engine
 
 In MBTI AI Skills, **intensity is not cosmetic**. Continuous 0–100% values modulate the phrasing and assertiveness of behavior directives:
@@ -256,6 +373,34 @@ For security, **no API keys are stored or exposed in the frontend**. The public 
 Anyone can contribute a cognitive Skill! Skills are decoupled from the UI engine.
 
 See [`skills/community/README.md`](skills/community/README.md) for the contribution guide and schema.
+
+---
+
+## 📁 Repository Structure
+
+```text
+mbti-ai-skills/
+├── docs/                        # Compatibility matrix & installation guides
+│   ├── compatibility.md
+│   └── installation.md
+├── portable-skills/             # 12 pre-built portable SKILL.md modules
+│   ├── README.md
+│   └── <skill-id>/SKILL.md
+├── skills/
+│   └── community/               # Community skill contributions & schema guide
+├── scripts/
+│   └── verify-framework.mjs     # Automated verification test suite (npm test)
+├── src/
+│   ├── components/              # Shared UI components & layout
+│   ├── data/                    # 16 MBTI profiles, 12 skills, compatibility matrix
+│   ├── engine/                  # Prompt generator, serializer, simulator, skill exporter
+│   ├── i18n/                    # 8-language localization (en, fr, ar, es, de, zh, pt, ja)
+│   ├── pages/                   # App routes (Home, Types, Builder, Compare, Lab, Skills, etc.)
+│   ├── store/                   # Zustand state & localStorage persistence
+│   ├── types/                   # TypeScript interfaces
+│   └── utils/                   # Helper utilities
+└── package.json
+```
 
 ---
 

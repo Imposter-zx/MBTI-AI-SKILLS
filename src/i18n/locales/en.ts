@@ -3,9 +3,11 @@ import type { Translations } from '../types';
 export const en: Translations = {
   // Navbar
   'nav.types': 'Explore Types',
+  'nav.skills': 'Skills Library',
   'nav.compare': 'Compare',
   'nav.builder': 'AI Mind Builder',
   'nav.lab': 'Test Lab',
+  'nav.compatibility': 'Compatibility',
   'nav.github': 'GitHub',
 
   // HomePage

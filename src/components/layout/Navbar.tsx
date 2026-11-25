@@ -13,10 +13,12 @@ export function Navbar() {
   const { t } = useI18n();
 
   const navLinks = [
-    { to: '/types',   label: t('nav.types') },
-    { to: '/compare', label: t('nav.compare') },
-    { to: '/builder', label: t('nav.builder') },
-    { to: '/lab',     label: t('nav.lab') },
+    { to: '/types',              label: t('nav.types') },
+    { to: '/skills',             label: t('nav.skills') },
+    { to: '/compare',            label: t('nav.compare') },
+    { to: '/builder',            label: t('nav.builder') },
+    { to: '/lab',                label: t('nav.lab') },
+    { to: '/docs/compatibility', label: t('nav.compatibility') },
   ];
 
   return (

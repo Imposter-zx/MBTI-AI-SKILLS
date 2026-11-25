@@ -146,3 +146,40 @@ export interface AppState {
   labSkills: SkillConfiguration[];
   labCommunicationStyle?: CommunicationStyle | string;
 }
+
+// ─── Custom Skills, Packs & Compatibility ─────────────────────────────────────
+export interface CustomSkill {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  purpose: string;
+  behaviors: string[];
+  workflow: string[];
+  examples: string[];
+  tags: string[];
+  createdAt: string;
+}
+
+export interface SkillPack {
+  type: MBTITypeCode;
+  name: string;
+  tagline: string;
+  category: MBTICategory;
+  skills: SkillId[];
+  description: string;
+}
+
+export type CompatibilitySupportLevel = 'native' | 'manual' | 'tool-specific' | 'unverified';
+
+export interface CompatibilityEntry {
+  id: string;
+  tool: string;
+  category: string;
+  supportLevel: CompatibilitySupportLevel;
+  summary: string;
+  verified: boolean;
+  details: string;
+  steps: string[];
+  notes?: string;
+}

@@ -2,9 +2,11 @@ import type { Translations } from '../types';
 
 export const ar: Translations = {
   'nav.types': 'استكشف الأنواع',
+  'nav.skills': 'مكتبة المهارات',
   'nav.compare': 'مقارنة',
   'nav.builder': 'بناء الذكاء الاصطناعي',
   'nav.lab': 'المختبر',
+  'nav.compatibility': 'التوافق',
   'nav.github': 'GitHub',
 
   'home.badge': 'إطار عمل ذكاء اصطناعي تجريبي — v1.2',

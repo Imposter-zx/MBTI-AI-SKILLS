@@ -4,13 +4,17 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 
 // Lazy-loaded pages — each becomes a separate chunk, shrinking the initial bundle
-const HomePage    = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
-const TypesPage   = lazy(() => import('./pages/TypesPage').then((m) => ({ default: m.TypesPage })));
-const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
-const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })));
-const BuilderPage = lazy(() => import('./pages/BuilderPage').then((m) => ({ default: m.BuilderPage })));
-const LabPage     = lazy(() => import('./pages/LabPage').then((m) => ({ default: m.LabPage })));
-const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const HomePage          = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
+const TypesPage         = lazy(() => import('./pages/TypesPage').then((m) => ({ default: m.TypesPage })));
+const ProfilePage       = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const ComparePage       = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })));
+const BuilderPage       = lazy(() => import('./pages/BuilderPage').then((m) => ({ default: m.BuilderPage })));
+const LabPage           = lazy(() => import('./pages/LabPage').then((m) => ({ default: m.LabPage })));
+const SkillsLibraryPage = lazy(() => import('./pages/SkillsLibraryPage').then((m) => ({ default: m.SkillsLibraryPage })));
+const CustomSkillPage   = lazy(() => import('./pages/CustomSkillPage').then((m) => ({ default: m.CustomSkillPage })));
+const SkillDetailPage   = lazy(() => import('./pages/SkillDetailPage').then((m) => ({ default: m.SkillDetailPage })));
+const CompatibilityPage = lazy(() => import('./pages/CompatibilityPage').then((m) => ({ default: m.CompatibilityPage })));
+const NotFoundPage      = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 /** Minimal suspense fallback — matches the app background color */
 function PageLoader() {
@@ -32,14 +36,18 @@ export function App() {
         <main className="flex-1">
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              <Route path="/"            element={<HomePage />} />
-              <Route path="/types"       element={<TypesPage />} />
-              <Route path="/types/:type" element={<ProfilePage />} />
-              <Route path="/compare"     element={<ComparePage />} />
-              <Route path="/builder"     element={<BuilderPage />} />
-              <Route path="/lab"         element={<LabPage />} />
-              <Route path="/404"         element={<NotFoundPage />} />
-              <Route path="*"            element={<Navigate to="/404" replace />} />
+              <Route path="/"                   element={<HomePage />} />
+              <Route path="/types"              element={<TypesPage />} />
+              <Route path="/types/:type"        element={<ProfilePage />} />
+              <Route path="/skills"             element={<SkillsLibraryPage />} />
+              <Route path="/skills/custom"      element={<CustomSkillPage />} />
+              <Route path="/skills/:id"         element={<SkillDetailPage />} />
+              <Route path="/docs/compatibility" element={<CompatibilityPage />} />
+              <Route path="/compare"            element={<ComparePage />} />
+              <Route path="/builder"            element={<BuilderPage />} />
+              <Route path="/lab"                element={<LabPage />} />
+              <Route path="/404"                element={<NotFoundPage />} />
+              <Route path="*"                   element={<Navigate to="/404" replace />} />
             </Routes>
           </Suspense>
         </main>

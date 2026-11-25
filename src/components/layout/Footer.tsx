@@ -9,9 +9,11 @@ export function Footer() {
   const links = [
     ['/', 'Home'],
     ['/types', t('nav.types')],
+    ['/skills', t('nav.skills')],
     ['/compare', t('nav.compare')],
     ['/builder', t('nav.builder')],
     ['/lab', t('nav.lab')],
+    ['/docs/compatibility', t('nav.compatibility')],
   ] as const;
 
   return (

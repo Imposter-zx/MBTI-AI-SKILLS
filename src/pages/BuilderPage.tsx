@@ -22,6 +22,8 @@ import {
   Layers,
   FileText,
   AlertCircle,
+  Copy,
+  Package,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { mbtiProfiles } from '../data/mbtiProfiles';
@@ -41,6 +43,12 @@ import {
   exportProfileJson,
   importProfileJson,
 } from '../engine/profileSerializer';
+import {
+  generateCognitiveProfileMarkdown,
+  generateCognitiveProfileSkillMd,
+  buildCognitiveProfileZip,
+  sanitizeSlug,
+} from '../engine/skillExporter';
 import { Button } from '../components/shared/Button';
 import { GlowCard } from '../components/shared/GlowCard';
 import { IntensitySlider } from '../components/shared/IntensitySlider';
@@ -96,6 +104,8 @@ export function BuilderPage() {
 
   const [step, setStep] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [copiedSkillMd, setCopiedSkillMd] = useState(false);
+  const [exportingZip, setExportingZip] = useState(false);
   const [editablePrompt, setEditablePrompt] = useState('');
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [importText, setImportText] = useState('');
@@ -128,15 +138,46 @@ export function BuilderPage() {
     setTimeout(() => setCopied(false), 3000);
   };
 
-  const handleExportJson = () => {
-    const json = exportProfileJson(builderProfile);
-    const blob = new Blob([json], { type: 'application/json' });
+  const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${builderProfile.baseType || 'cognitive'}-profile.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportJson = () => {
+    const json = exportProfileJson(builderProfile);
+    downloadBlob(
+      new Blob([json], { type: 'application/json' }),
+      `${builderProfile.baseType || 'cognitive'}-profile.json`
+    );
+  };
+
+  const handleExportMarkdown = () => {
+    const md = generateCognitiveProfileMarkdown(builderProfile);
+    const slug = sanitizeSlug(currentDisplayName);
+    downloadBlob(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${slug}.md`);
+  };
+
+  const handleCopySkillMd = async () => {
+    const skillMd = generateCognitiveProfileSkillMd(builderProfile);
+    await navigator.clipboard.writeText(skillMd);
+    setCopiedSkillMd(true);
+    setTimeout(() => setCopiedSkillMd(false), 3000);
+  };
+
+  const handleExportZip = async () => {
+    if (exportingZip) return;
+    setExportingZip(true);
+    try {
+      const blob = await buildCognitiveProfileZip(builderProfile);
+      const slug = sanitizeSlug(currentDisplayName);
+      downloadBlob(blob, `${slug}-skill.zip`);
+    } finally {
+      setExportingZip(false);
+    }
   };
 
   const handleImportJson = () => {
@@ -647,7 +688,7 @@ export function BuilderPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons & Export Bar */}
               <div className="space-y-2 pt-2 border-t border-white/5">
                 <Button onClick={saveCurrentProfile} variant="primary" size="sm" fullWidth disabled={!builderProfile.baseType}>
                   <Save className="w-4 h-4" />
@@ -657,10 +698,54 @@ export function BuilderPage() {
                   {copied ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
                   {copied ? 'Share Link Copied!' : 'Share Profile URL'}
                 </Button>
-                <Button onClick={handleExportJson} variant="ghost" size="sm" fullWidth disabled={!builderProfile.baseType}>
-                  <Download className="w-4 h-4" />
-                  Export JSON Profile
-                </Button>
+
+                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
+                    Portable Export
+                  </span>
+                  <Button
+                    onClick={handleExportZip}
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    disabled={!builderProfile.baseType || exportingZip}
+                  >
+                    <Package className="w-4 h-4 text-cyan-400" />
+                    {exportingZip ? 'Building ZIP…' : 'Download Portable Skill ZIP'}
+                  </Button>
+                  <Button
+                    onClick={handleCopySkillMd}
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
+                    disabled={!builderProfile.baseType}
+                  >
+                    {copiedSkillMd ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    {copiedSkillMd ? 'Copied!' : 'Copy SKILL.md'}
+                  </Button>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Button
+                      onClick={handleExportMarkdown}
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      disabled={!builderProfile.baseType}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Export .md
+                    </Button>
+                    <Button
+                      onClick={handleExportJson}
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      disabled={!builderProfile.baseType}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Export JSON
+                    </Button>
+                  </div>
+                </div>
               </div>
             </GlowCard>
 
